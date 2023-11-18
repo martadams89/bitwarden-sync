@@ -100,10 +100,10 @@ Add the following cron job entries to run the scripts every 6 hours with a 10-mi
 
 ```bash
 # Run backup every 6 hours with a 10-minute interval
-0 */6 * * * /path/to/bitwarden_backup.sh > /dev/null
+0 */6 * * * /path/to/1-bitwarden_backup.sh > /dev/null
 
-# Run restore.sh every 6 hours with a 10-minute interval, starting 10 minutes after the first script
-10 */6 * * * /path/to/bitwarden_restore.sh > /dev/null
+# Run restore every 6 hours with a 10-minute interval, starting 10 minutes after the first script
+10 */6 * * * /path/to/2-bitwarden_restore.sh > /dev/null
 ```
 
 🚀 Your Bitwarden Backup and Restore setup is now complete!
