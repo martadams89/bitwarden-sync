@@ -6,7 +6,8 @@
 
 ### Bitwarden CLI must be already installed
 
-### [You will need your API Keys] (https://bitwarden.com/help/personal-api-key/)
+### API Keys
+[You will need your API Keys] (https://bitwarden.com/help/personal-api-key/)
 
 Before running the backup and restore scripts, you need to set up your passwords and keyfiles securely.
 
