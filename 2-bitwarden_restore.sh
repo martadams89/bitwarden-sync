@@ -34,24 +34,27 @@ for id in $(jq '.folders[]? | .id' $ENC_OUTPUT_FILE); do
   # Remove quotes from the ID
   id=$(sed 's/"//g' <<< "$id")
   # Run your command here, replacing "$id" with the actual ID
-  (bw --session $BW_SESSION --raw delete -p folder $id)
+  (bw --session $BW_SESSION --raw delete -p folder $id &)
 done
+wait
 
 # Find and remove all items
 for id in $(jq '.items[]? | .id' $ENC_OUTPUT_FILE); do
   # Remove quotes from the ID
   id=$(sed 's/"//g' <<< "$id")
   # Run your command here, replacing "$id" with the actual ID
-  (bw --session $BW_SESSION --raw delete -p item $id)
+  (bw --session $BW_SESSION --raw delete -p item $id &)
 done
+wait
 
 # Find and remove all attachments
 for id in $(jq '.attachments[]? | .id' $ENC_OUTPUT_FILE); do
   # Remove quotes from the ID
   id=$(sed 's/"//g' <<< "$id")
   # Run your command here, replacing "$id" with the actual ID
-  bw --session $BW_SESSION --raw delete -p attachment $id
+  (bw --session $BW_SESSION --raw delete -p attachment $id &)
 done
+wait
 
 # Find the latest backup file
 LATEST_BACKUP=$(find backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
