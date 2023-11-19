@@ -70,16 +70,16 @@ openssl enc -d -aes-256-cbc -pass pass:"$password" -in "$encrypted_file" | \
 
 echo "Decompression completed successfully."
 
+# Find the latest backup file
+LATEST_BACKUP=$(find backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
+
 # import the latest backup
 bw --session $BW_SESSION --raw import bitwardenjson $LATEST_BACKUP
 
 # Clean up our item list to delete
 rm $ENC_OUTPUT_FILE
 
-# Find the latest backup file
-LATEST_BACKUP_JSON=$(find backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
-
-rm -f $LATEST_BACKUP_JSON
+rm -f $LATEST_BACKUP
 
 # Logout and unset variables
 bw logout > /dev/null
