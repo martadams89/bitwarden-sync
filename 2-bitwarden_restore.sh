@@ -10,6 +10,7 @@ export BW_RESTORE_PASS=$(openssl enc -d -aes-256-cbc -in bitwarden_restore_passw
 export BW_CLIENTID=XXXXX
 export BW_CLIENTSECRET=XXXX
 export BW_SERVER=https://vault.bitwarden.com
+export BW_TAR_PASS=$(openssl enc -d -aes-256-cbc -in bitwarden_backup_password.enc -pass file:bitwarden_backup_keyfile)
 
 # We want to remove itms later, so we set a base filename now
 EXPORT_OUTPUT_BASE="bw_vault_items_to_remove"
@@ -57,13 +58,28 @@ done
 wait
 
 # Find the latest backup file
-LATEST_BACKUP=$(find backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
+LATEST_BACKUP_TAR=$(find backups/bw_export_*.tar.gz.enc -type f -exec ls -t1 {} + | head -1)
+
+# Set your encrypted file and password
+encrypted_file="$LATEST_BACKUP_TAR"
+password="$BW_TAR_PASS"
+
+# Decrypt the file and extract it
+openssl enc -d -aes-256-cbc -pass pass:"$password" -in "$encrypted_file" | \
+  tar -xzf -
+
+echo "Decompression completed successfully."
 
 # import the latest backup
 bw --session $BW_SESSION --raw import bitwardenjson $LATEST_BACKUP
 
 # Clean up our item list to delete
 rm $ENC_OUTPUT_FILE
+
+# Find the latest backup file
+LATEST_BACKUP_JSON=$(find backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
+
+rm $LATEST_BACKUP_JSON
 
 # Logout and unset variables
 bw logout > /dev/null
@@ -73,3 +89,4 @@ unset BW_ACCOUNT
 unset BW_CLIENTID
 unset BW_SECRET
 unset BW_SERVER
+unset BW_TAR_PASS
