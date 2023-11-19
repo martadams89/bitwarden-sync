@@ -79,7 +79,7 @@ rm $ENC_OUTPUT_FILE
 # Find the latest backup file
 LATEST_BACKUP_JSON=$(find backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
 
-rm $LATEST_BACKUP_JSON
+rm -f $LATEST_BACKUP_JSON
 
 # Logout and unset variables
 bw logout > /dev/null
