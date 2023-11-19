@@ -37,7 +37,6 @@ for id in $(jq '.folders[]? | .id' $ENC_OUTPUT_FILE); do
   # Run your command here, replacing "$id" with the actual ID
   (bw --session $BW_SESSION --raw delete -p folder $id)
 done
-wait
 
 # Find and remove all items
 for id in $(jq '.items[]? | .id' $ENC_OUTPUT_FILE); do
@@ -46,7 +45,6 @@ for id in $(jq '.items[]? | .id' $ENC_OUTPUT_FILE); do
   # Run your command here, replacing "$id" with the actual ID
   (bw --session $BW_SESSION --raw delete -p item $id)
 done
-wait
 
 # Find and remove all attachments
 for id in $(jq '.attachments[]? | .id' $ENC_OUTPUT_FILE); do
@@ -55,7 +53,6 @@ for id in $(jq '.attachments[]? | .id' $ENC_OUTPUT_FILE); do
   # Run your command here, replacing "$id" with the actual ID
   (bw --session $BW_SESSION --raw delete -p attachment $id)
 done
-wait
 
 # Find the latest backup file
 LATEST_BACKUP_TAR=$(find backups/bw_export_*.tar.gz.enc -type f -exec ls -t1 {} + | head -1)
