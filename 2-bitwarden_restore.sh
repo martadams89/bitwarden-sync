@@ -51,7 +51,7 @@ for id in $(jq '.attachments[]? | .id' $ENC_OUTPUT_FILE); do
   # Remove quotes from the ID
   id=$(sed 's/"//g' <<< "$id")
   # Run your command here, replacing "$id" with the actual ID
-  (bw --session $BW_SESSION --raw delete -p attachment $id)
+  bw --session $BW_SESSION --raw delete -p attachment $id
 done
 
 # Find the latest backup file
