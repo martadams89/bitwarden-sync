@@ -29,7 +29,7 @@ ENV BW_CLIENTSECRET_DEST=${BW_CLIENTSECRET_SOURCE}
 ENV BW_SERVER_DEST=${BW_SERVER_DEST}
 
 # Copy your script and encryption files to the container
-COPY bitwarden_sync.sh /app/script.sh
+COPY docker/bitwarden_sync.sh /app/script.sh
 
 # Make your script executable
 RUN chmod +x /app/script.sh
