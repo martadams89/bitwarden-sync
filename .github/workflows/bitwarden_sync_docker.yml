@@ -26,6 +26,6 @@ jobs:
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}   
       run: |
-        docker buildx build /docker/Dockerfile -t $DOCKER_USERNAME/bitwarden-sync:latest --platform linux/arm64,linux/arm/v6,linux/amd64 --push
+        docker buildx build bitwarden-sync --file ./docker/Dockerfile -t $DOCKER_USERNAME/bitwarden-sync:latest --platform linux/arm64,linux/arm/v6,linux/amd64 --push
 # linux/arm/v5,
 # linux/386,linux/amd64,linux/arm/v5,linux/arm/v7,linux/arm64/v8
