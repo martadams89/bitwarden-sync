@@ -5,7 +5,7 @@ FROM alpine:latest
 WORKDIR /app
 
 # Install required packages
-RUN apk --no-cache add cat python3 curl bash ca-certificates openssl ncurses coreutils make gcc g++ libgcc linux-headers grep util-linux binutils findutils uuidgen nodejs npm wget unzip tar openssl jq bash
+RUN apk --no-cache add python3 curl bash ca-certificates openssl ncurses coreutils make gcc g++ libgcc linux-headers grep util-linux binutils findutils uuidgen nodejs npm wget unzip tar openssl jq bash
 
 # Install Bitwarden CLI
 RUN npm install -g @bitwarden/cli
@@ -38,7 +38,7 @@ RUN chmod +x /app/script.sh
 RUN echo "$CRON_SCHEDULE root /app/script.sh > /var/log/cron.log 2>&1" > /app/crontab.txt
 RUN chmod 0644 /app/crontab.txt
 
-RUN cat /tmp/crontab.txt > /etc/crontabs/root
+RUN cat /app/crontab.txt > /etc/crontabs/root
 
 # Start cron
 CMD ["crond", "-f", "-l", "2"]
