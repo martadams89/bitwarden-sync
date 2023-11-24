@@ -2,7 +2,7 @@
 
 🔐 backup and restore your Bitwarden vault between servers.
 
-## Using Docker? See `docker-compose.yml` in the `docker` folder!
+## Using Docker? See [docker-compose.yml](https://github.com/martadams89/bitwarden-sync/blob/main/docker/docker-compose.yml)
 
 ## Pre-Task: Set Up Passwords and Keyfiles
 
