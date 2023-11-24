@@ -5,7 +5,9 @@ FROM alpine:latest
 WORKDIR /app
 
 # Install required packages
-RUN apk --no-cache add uuidgen nodejs npm wget unzip tar openssl jq
+RUN apk --no-cache add python3 uuidgen nodejs npm wget unzip tar openssl jq
+
+RUN exec bash
 
 # Install Bitwarden CLI
 RUN npm install -g @bitwarden/cli
