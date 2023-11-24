@@ -38,7 +38,7 @@ RUN chmod +x /app/script.sh
 RUN echo "$CRON_SCHEDULE root /app/script.sh > /var/log/cron.log 2>&1" > /app/crontab.txt
 RUN chmod 0644 /app/crontab.txt
 
-RUN /usr/bin/crontab /app/crontab.txt
+RUN cat /tmp/crontab.txt > /etc/crontabs/root
 
 # Start cron
-CMD /usr/bin/crontab && tail -f /var/log/cron.log
+CMD ["crond", "-f", "-l", "2"]

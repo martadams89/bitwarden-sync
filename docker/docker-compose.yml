@@ -1,7 +1,7 @@
 version: "3.6"
 services:
   bitwarden-sync:
-    image: extcee/bitwarden-sync:latest
+    image: martadams89/bitwarden-sync:latest
     container_name: bitwarden-sync
     restart: always
     environment:
@@ -19,3 +19,5 @@ services:
       - BW_SERVER_DEST=https://vault.bitwarden.com
       - HEALTHCHECK_URL=https://healtcheck.url.com/ping
       - HEALTHCHECK_PING=1234343r3fadgsdgs
+    volumes:
+      - ./config:/app
