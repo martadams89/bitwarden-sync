@@ -5,9 +5,7 @@ FROM alpine:latest
 WORKDIR /app
 
 # Install required packages
-RUN apk --no-cache add python3 uuidgen nodejs npm wget unzip tar openssl jq
-
-RUN exec bash
+RUN apk --no-cache add virtual .gyp python3 make g++ uuidgen nodejs npm wget unzip tar openssl jq
 
 # Install Bitwarden CLI
 RUN npm install -g @bitwarden/cli
