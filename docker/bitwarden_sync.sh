@@ -1,5 +1,17 @@
 #!/bin/bash
 
+RID=`uuidgen`
+# Check if HEALTHCHECK_URL and HEALTHCHECK_PING are set
+if [ -n "$HEALTHCHECK_URL" ] && [ -n "$HEALTHCHECK_PING" ]; then
+    URL=$HEALTHCHECK_URL
+    PING=$HEALTHCHECK_PING
+
+    # Send a start ping, specify rid parameter:
+    curl -fsS -m 10 --retry 5 "$URL/$PING/start?rid=$RID"
+else
+    echo "Skipping health check as HEALTHCHECK_URL or HEALTHCHECK_PING is not set."
+fi
+
 # We need to set some variables
 # Set your account name, Vault master password and API Info
 # Set the BitWarden Server we want to use
@@ -153,3 +165,13 @@ unset BW_ACCOUNT_DEST
 unset BW_PASS_DEST
 unset BW_CLIENTSECRET_DEST
 unset BW_SERVER_DEST
+
+
+# Check if HEALTHCHECK_URL and HEALTHCHECK_PING are set
+if [ -n "$HEALTHCHECK_URL" ] && [ -n "$HEALTHCHECK_PING" ]; then
+
+    # send the success ping, use same rid parameter:
+    curl -fsS -m 10 --retry 5 $URL/$PING?rid=$RID
+else
+    echo "Skipping health check as HEALTHCHECK_URL or HEALTHCHECK_PING is not set."
+fi
