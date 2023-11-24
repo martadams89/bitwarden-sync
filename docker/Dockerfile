@@ -5,7 +5,7 @@ FROM alpine:latest
 WORKDIR /app
 
 # Install required packages
-RUN apk --no-cache add uuid wget unzip tar openssl jq
+RUN apk --no-cache add uuidgen  wget unzip tar openssl jq
 
 # Install Bitwarden CLI
 RUN wget -O /tmp/bw.zip https://vault.bitwarden.com/download/?app=cli&version=latest && \
