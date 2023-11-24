@@ -5,13 +5,10 @@ FROM alpine:latest
 WORKDIR /app
 
 # Install required packages
-RUN apk --no-cache add uuidgen  wget unzip tar openssl jq
+RUN apk --no-cache add uuidgen nodejs npm wget unzip tar openssl jq
 
 # Install Bitwarden CLI
-RUN wget -O /tmp/bw.zip https://vault.bitwarden.com/download/?app=cli&version=latest && \
-    unzip /tmp/bw.zip -d /usr/local/bin && \
-    chmod +x /usr/local/bin/bw && \
-    rm /tmp/bw.zip
+RUN npm install -g @bitwarden/cli
 
 # Copy your script and encryption files to the container
 COPY bitwarden_sync.sh /app/script.sh
