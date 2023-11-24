@@ -10,24 +10,6 @@ RUN apk --no-cache add python3 curl bash ca-certificates openssl ncurses coreuti
 # Install Bitwarden CLI
 RUN npm install -g @bitwarden/cli
 
-# Set environment variables
-ENV LC_CTYPE=C
-ENV LC_ALL=C
-
-# Define cron schedule and script variables
-ENV $CRON_SCHEDULE
-ENV $BW_TAR_PASS
-ENV $BW_ACCOUNT_SOURCE
-ENV $BW_PASS_SOURCE
-ENV $BW_CLIENTID_SOURCE
-ENV $BW_CLIENTSECRET_SOURCE
-ENV $BW_SERVER_SOURCE
-ENV $BW_ACCOUNT_DEST
-ENV $BW_PASS_DEST
-ENV $BW_CLIENTID_DEST
-ENV $BW_CLIENTSECRET_SOURCE
-ENV $BW_SERVER_DEST
-
 # Copy your script and encryption files to the container
 COPY docker/bitwarden_sync.sh /app/script.sh
 
@@ -35,7 +17,7 @@ COPY docker/bitwarden_sync.sh /app/script.sh
 RUN chmod +x /app/script.sh
 
 # Create a cron job file with the defined schedule
-RUN cat $CRON_SCHEDULE > /app/crontab.txt
+RUN cat ${CRON_SCHEDULE} > /app/crontab.txt
 RUN echo -n " root /app/script.sh > /var/log/cron.log 2>&1" >> /app/crontab.txt
 RUN chmod 0644 /app/crontab.txt
 

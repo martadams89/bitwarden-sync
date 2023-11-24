@@ -20,4 +20,4 @@ services:
       - HEALTHCHECK_URL=https://healtcheck.url.com/ping
       - HEALTHCHECK_PING=1234343r3fadgsdgs
     volumes:
-      - ./config:/app
+      - ./config/backups:/app/backups
