@@ -10,12 +10,6 @@ RUN apk --no-cache add uuidgen nodejs npm wget unzip tar openssl jq
 # Install Bitwarden CLI
 RUN npm install -g @bitwarden/cli
 
-# Copy your script and encryption files to the container
-COPY bitwarden_sync.sh /app/script.sh
-
-# Make your script executable
-RUN chmod +x /app/script.sh
-
 # Set environment variables
 ENV LC_CTYPE=C
 ENV LC_ALL=C
@@ -34,10 +28,17 @@ ENV BW_CLIENTID_DEST=${BW_CLIENTID_DEST}
 ENV BW_CLIENTSECRET_DEST=${BW_CLIENTSECRET_SOURCE}
 ENV BW_SERVER_DEST=${BW_SERVER_DEST}
 
+# Copy your script and encryption files to the container
+COPY bitwarden_sync.sh /app/script.sh
+
+# Make your script executable
+RUN chmod +x /app/script.sh
+
 # Create a cron job file with the defined schedule
-RUN echo "$CRON_SCHEDULE root /app/script.sh > /var/log/cron.log 2>&1" > /etc/cron.d/script-cron
-RUN chmod 0644 /etc/cron.d/script-cron && \
-    touch /var/log/cron.log
+RUN echo "$CRON_SCHEDULE root /app/script.sh > /var/log/cron.log 2>&1" > /app/crontab.txt
+RUN chmod 0644 /app/crontab.txt && \
+
+RUN /usr/bin/crontab /crontab.txt
 
 # Start cron
-CMD cron && tail -f /var/log/cron.log
+CMD /usr/bin/crontab && tail -f /var/log/cron.log
