@@ -36,7 +36,7 @@ RUN chmod +x /app/script.sh
 
 # Create a cron job file with the defined schedule
 RUN echo "$CRON_SCHEDULE root /app/script.sh > /var/log/cron.log 2>&1" > /app/crontab.txt
-RUN chmod 0644 /app/crontab.txt && \
+RUN chmod 0644 /app/crontab.txt
 
 RUN /usr/bin/crontab /crontab.txt
 
