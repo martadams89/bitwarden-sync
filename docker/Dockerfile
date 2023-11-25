@@ -30,12 +30,11 @@ COPY docker/bitwarden_sync.sh /app/script.sh
 # Make your script executable
 RUN chmod +x /app/script.sh
 
-# Create a cron job file with the defined schedule
-RUN cat ${CRON_SCHEDULE} > /app/crontab.txt
-RUN echo " root /app/script.sh > /var/log/cron.log 2>&1" >> /app/crontab.txt
-RUN chmod 0644 /app/crontab.txt
+# Define a default cron schedule
+ENV CRON_SCHEDULE="57 23 * * *"
 
-RUN cat /app/crontab.txt > /etc/crontabs/root
+# Create a cron job file with the defined schedule
+RUN echo "$CRON_SCHEDULE root /app/script.sh > /var/log/cron.log 2>&1" > /etc/crontabs/root
 
 # Start cron
 CMD ["crond", "-f", "-l", "2"]
