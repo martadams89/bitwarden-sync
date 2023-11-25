@@ -1,0 +1,25 @@
+version: "3.6"
+services:
+  bitwarden-sync:
+    image: martadams89/bitwarden-sync:latest
+    container_name: bitwarden-sync
+    restart: always
+    environment:
+      - CRON_SCHEDULE=0 0 * * *
+      - BW_TAR_PASS=mysecuretarpassword
+      - BW_ACCOUNT_SOURCE=mybitwardensource@email.com
+      - BW_PASS_SOURCE=mybitwardensourcepassword
+      - BW_CLIENTID_SOURCE=user.32323232-3232323-232323-3232323-32323232
+      - BW_CLIENTSECRET_SOURCE=FdfdfdfdfdfdfFfdfdffdfdfd
+      - BW_SERVER_SOURCE=https://vault.mydomain.com
+      - BW_ACCOUNT_DEST=mybitwardendest@email.com
+      - BW_PASS_DEST=mybitwardendestpassword
+      - BW_CLIENTID_DEST=user.1221212-121212-12121-12121
+      - BW_CLIENTSECRET_DEST=Dsfdfdfdfdfdfdfdfdfgfdfdfds
+      - BW_SERVER_DEST=https://vault.bitwarden.com
+      # Optional Healthcheck IO Integration
+      - HEALTHCHECK_URL=https://healtcheck.url.com/ping
+      - HEALTHCHECK_PING=1234343r3fadgsdgs
+      # Optional bind mount encrypted backups
+    volumes:
+      - ./config/backups:/app/backups
