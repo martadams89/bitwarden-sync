@@ -5,7 +5,7 @@ services:
     container_name: bitwarden-sync
     restart: always
     environment:
-      - CRON_SCHEDULE="0 0 * * *"
+      - CRON_SCHEDULE=0 0 * * *
       - BW_TAR_PASS=mysecuretarpassword
       - BW_ACCOUNT_SOURCE=mybitwardensource@email.com
       - BW_PASS_SOURCE=mybitwardensourcepassword
