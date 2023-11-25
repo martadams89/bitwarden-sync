@@ -4,7 +4,7 @@
 
 ### [You will need your API Keys](https://bitwarden.com/help/personal-api-key/)
 
-### NOTE: This does not currently sync Orgnizations or multiple users.
+### NOTE: This does not currently sync Orgnisations or multiple users.
 
 ## Using Docker? See [docker-compose.yml](https://github.com/martadams89/bitwarden-sync/blob/main/docker/docker-compose.yml)
 
