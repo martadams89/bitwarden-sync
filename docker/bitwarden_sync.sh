@@ -12,30 +12,6 @@ else
     echo "Skipping health check as HEALTHCHECK_URL or HEALTHCHECK_PING is not set."
 fi
 
-# We need to set some variables
-# Set your account name, Vault master password and API Info
-# Set the BitWarden Server we want to use
-
-export LC_CTYPE=C
-export LC_ALL=C
-
-export BW_TAR_PASS=$(openssl enc -d -aes-256-cbc -in bitwarden_backup_password.enc -pass file:bitwarden_backup_keyfile)
-
-#Source Variables
-export BW_TAR_PASS=${BW_TAR_PASS}
-export BW_ACCOUNT_SOURCE=${BW_ACCOUNT_SOURCE}
-export BW_PASS_SOURCE=${BW_PASS_SOURCE}
-export BW_CLIENTID_SOURCE=${BW_CLIENTID_SOURCE}
-export BW_CLIENTSECRET_SOURCE=${BW_CLIENTSECRET_SOURCE}
-export BW_SERVER_SOURCE=${BW_SERVER_SOURCE}
-
-#Destination Variables
-export BW_ACCOUNT_DEST=${BW_ACCOUNT_DEST}
-export BW_PASS_DEST=${BW_PASS_DEST}
-export BW_CLIENTID_DEST=${BW_CLIENTID_DEST}
-export BW_CLIENTSECRET_DEST=${BW_CLIENTSECRET_SOURCE}
-export BW_SERVER_DEST=${BW_SERVER_DEST}
-
 ##### Backup/Export from Source Bitwarden
 
 # We need a backups directory
