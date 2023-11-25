@@ -15,12 +15,12 @@ fi
 ##### Backup/Export from Source Bitwarden
 
 # We need a backups directory
-mkdir -p backups
+mkdir -p /app/backups
 
 # Set the filename for our json export as variable
 SOURCE_EXPORT_OUTPUT_BASE="bw_export_"
 TIMESTAMP=$(date "+%Y%m%d%H%M%S")
-SOURCE_OUTPUT_FILE=backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.json
+SOURCE_OUTPUT_FILE_JSON=/app/backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.json
 
 # Delete previous backups over 30 days old
 #
@@ -28,7 +28,7 @@ SOURCE_OUTPUT_FILE=backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.json
 current_date=$(date +%Y-%m-%d)
 
 # Find all tar.gz.enc files starting with "bw_export_" in the backups folder
-source_export_files=$(find backups -type f -name "bw_export_*.tar.gz.enc")
+source_export_files=$(find /app/backups -type f -name "bw_export_*.tar.gz.enc")
 
 # Delete any files older than 30 days
 find $source_export_files -type f -mtime +30 -exec rm -f {} +
@@ -47,15 +47,15 @@ bw login $BW_ACCOUNT_SOURCE --apikey --raw
 BW_SESSION_SOURCE=$(bw unlock $BW_BACKUP_PASS_SOURCE --raw)
 
 # Export out all items
-bw --session $BW_SESSION_SOURCE --raw export --format json > $SOURCE_OUTPUT_JSON
+bw --session $BW_SESSION_SOURCE --raw export --format json > $SOURCE_OUTPUT_FILE_JSON
 
 # Add file to encrypted tar
-file_to_compress="$SOURCE_OUTPUT_JSON"
+file_to_compress="$SOURCE_OUTPUT_FILE_JSON"
 
 tar -czf - "$file_to_compress" | \
-  openssl enc -aes-256-cbc -pass pass:"$BW_TAR_PASS" -out "backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.tar.gz.enc"
+  openssl enc -aes-256-cbc -pass pass:"$BW_TAR_PASS" -out "/app/backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.tar.gz.enc"
 
-rm -f $SOURCE_OUTPUT_JSON
+rm -f $SOURCE_OUTPUT_FILE_JSON
 
 ### End of Backup
 
@@ -104,7 +104,7 @@ for id in $(jq '.attachments[]? | .id' $DEST_OUTPUT_FILE); do
 done
 
 # Find the latest backup file
-DEST_LATEST_BACKUP_TAR=$(find backups/bw_export_*.tar.gz.enc -type f -exec ls -t1 {} + | head -1)
+DEST_LATEST_BACKUP_TAR=$(find /app/backups/bw_export_*.tar.gz.enc -type f -exec ls -t1 {} + | head -1)
 
 # Set your encrypted file and password
 encrypted_source_tar="$DEST_LATEST_BACKUP_TAR"
@@ -117,7 +117,7 @@ openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_so
 echo "Decompression completed successfully."
 
 # Find the latest backup file
-DEST_LATEST_BACKUP_JSON=$(find backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
+DEST_LATEST_BACKUP_JSON=$(find /app/backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
 
 # import the latest backup
 bw --session $BW_SESSION_DEST --raw import bitwardenjson $DEST_LATEST_BACKUP_JSON

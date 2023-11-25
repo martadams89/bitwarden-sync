@@ -32,7 +32,7 @@ mkdir -p backups
 # Set the filename for our json export as variable
 SOURCE_EXPORT_OUTPUT_BASE="bw_export_"
 TIMESTAMP=$(date "+%Y%m%d%H%M%S")
-SOURCE_OUTPUT_FILE=backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.json
+SOURCE_OUTPUT_FILE_JSON=backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.json
 
 # Delete previous backups over 30 days old
 #
@@ -59,15 +59,15 @@ bw login $BW_ACCOUNT_SOURCE --apikey --raw
 BW_SESSION_SOURCE=$(bw unlock $BW_BACKUP_PASS_SOURCE --raw)
 
 # Export out all items
-bw --session $BW_SESSION_SOURCE --raw export --format json > $SOURCE_OUTPUT_JSON
+bw --session $BW_SESSION_SOURCE --raw export --format json > $SOURCE_OUTPUT_FILE_JSON
 
 # Add file to encrypted tar
-file_to_compress="$SOURCE_OUTPUT_JSON"
+file_to_compress="$SOURCE_OUTPUT_FILE_JSON"
 
 tar -czf - "$file_to_compress" | \
   openssl enc -aes-256-cbc -pass pass:"$BW_TAR_PASS" -out "backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.tar.gz.enc"
 
-rm -f $SOURCE_OUTPUT_JSON
+rm -f $SOURCE_OUTPUT_FILE_JSON
 
 ### End of Backup
 
