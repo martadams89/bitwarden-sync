@@ -36,4 +36,4 @@ COPY docker/bitwarden_sync.sh /app/script.sh
 RUN chmod +x /app/script.sh
 
 # Start cron and log output to console
-CMD ["sh", "-c", "echo \"$CRON_SCHEDULE root /app/script.sh > /proc/1/fd/1 2>&1\" > /etc/crontabs/root && crond -f -L /dev/stdout"]
+CMD ["sh", "-c", "echo \"$CRON_SCHEDULE /app/script.sh > /proc/1/fd/1 2>&1\" > /etc/crontabs/root && crond -f -L /dev/stdout"]
