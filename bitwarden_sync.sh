@@ -23,8 +23,19 @@ export BW_CLIENTID_DEST=XXXXX
 export BW_CLIENTSECRET_DEST=XXXX
 export BW_SERVER_DEST=https://vault.bitwarden.com
 
+# Set start time
+START_TIME=$(date)
+echo "### Bitwarden Script - Start ###"
+echo "# Start Time: $START_TIME #"
+echo "################################"
+
+export BW_CLIENTID=${BW_CLIENTID_SOURCE}
+export BW_CLIENTSECRET=${BW_CLIENTSECRET_SOURCE}
 
 ##### Backup/Export from Source Bitwarden
+
+echo "### Backup - Start ###"
+echo "# Start of Backup Process #"
 
 # We need a backups directory
 mkdir -p backups
@@ -35,43 +46,41 @@ TIMESTAMP=$(date "+%Y%m%d%H%M%S")
 SOURCE_OUTPUT_FILE_JSON=backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.json
 
 # Delete previous backups over 30 days old
-#
-# Get the current date
+echo "# Deleting previous backups older than 30 days... #"
 current_date=$(date +%Y-%m-%d)
-
-# Find all tar.gz.enc files starting with "bw_export_" in the backups folder
 source_export_files=$(find backups -type f -name "bw_export_*.tar.gz.enc")
-
-# Delete any files older than 30 days
 find $source_export_files -type f -mtime +30 -exec rm -f {} +
-
-# Delete any bw_export json files that have been left over
 rm -f -R $SOURCE_EXPORT_OUTPUT_BASE*.json
 
 # Lets make sure we're logged out before we get to work
+echo "# Logging out from Bitwarden... #"
 bw logout
 
 # Login to our Server
+echo "# Logging into Source Bitwarden Server... #"
 bw config server $BW_SERVER_SOURCE
 bw login $BW_ACCOUNT_SOURCE --apikey --raw
 
 # Because we're using an API Key, we need to unlock the vault to get a session ID
-BW_SESSION_SOURCE=$(bw unlock $BW_BACKUP_PASS_SOURCE --raw)
+echo "# Unlocking the vault... #"
+BW_SESSION_SOURCE=$(bw unlock $BW_PASS_SOURCE --raw)
 
 # Export out all items
+echo "# Exporting all items... #"
 bw --session $BW_SESSION_SOURCE --raw export --format json > $SOURCE_OUTPUT_FILE_JSON
 
 # Add file to encrypted tar
 file_to_compress="$SOURCE_OUTPUT_FILE_JSON"
-
 tar -czf - "$file_to_compress" | \
-  openssl enc -aes-256-cbc -pass pass:"$BW_TAR_PASS" -out "backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.tar.gz.enc"
+  openssl enc -aes-256-cbc -pass pass:"$BW_TAR_PASS" -out "/app/backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.tar.gz.enc"
 
+# Cleanup
 rm -f $SOURCE_OUTPUT_FILE_JSON
 
-### End of Backup
+echo "# End of Backup Process #"
+echo "### Backup - End ###"
 
-### Start of Restore
+### End of Backup
 
 # Restoring process
 echo "### Restore - Start ###"
@@ -124,9 +133,14 @@ rm -f $DEST_LATEST_BACKUP_JSON
 rm -f $decrypted_tar
 rm -f $NEW_ENTRIES_FILE
 
-### End of Restore
+
+echo "# End of Restore Process #"
+echo "### Restore - End ###"
 
 bw logout > /dev/null
+
+unset BW_CLIENTID
+unset BW_CLIENTSECRET
 
 unset BW_TAR_PASS
 unset BW_ACCOUNT_SOURCE
