@@ -1,0 +1,31 @@
+name: Bitwarden Sync Dev
+
+on:
+  schedule:
+    - cron:  '0 0 * * 5'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+          
+    - name: docker buildx multiarch
+      run: |
+        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+        docker buildx create --name multiarch --driver docker-container --use
+        docker buildx inspect --bootstrap
+    - name: docker build docker
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}   
+      run: |
+        docker buildx build . -t $DOCKER_USERNAME/bitwarden-sync:dev -f docker/Dockerfile --platform linux/arm64,linux/arm/v6,linux/amd64 --push
+# linux/arm/v5,
+# linux/386,linux/amd64,linux/arm/v5,linux/arm/v7,linux/arm64/v8
