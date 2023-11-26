@@ -95,17 +95,21 @@ bw config server $BW_SERVER_DEST
 bw login $BW_ACCOUNT_DEST --apikey --raw
 BW_SESSION_DEST=$(bw unlock $BW_PASS_DEST --raw)
 
+# Export out all items from Destination
+DEST_OUTPUT_FILE_JSON=/app/backups/DEST_OUTPUT_$TIMESTAMP.json
+echo "# Exporting all items from destination... #"
+bw --session $BW_SESSION_DEST --raw export --format json > $DEST_OUTPUT_FILE_JSON
+
 # Find the latest backup file
-DEST_LATEST_BACKUP_TAR=$(find /app/backups/bw_export_*.tar.gz.enc -type f -exec ls -t1 {} + | head -1)
+SOURCE_LATEST_BACKUP_TAR=$(find /app/backups/bw_export_*.tar.gz.enc -type f -exec ls -t1 {} + | head -1)
 
 # Set your encrypted file and password
-encrypted_source_tar="$DEST_LATEST_BACKUP_TAR"
+encrypted_source_tar="$SOURCE_LATEST_BACKUP_TAR"
 source_tar_password="$BW_TAR_PASS"
 
 # Decrypt the file and extract it
 echo "# Decrypting and extracting the latest backup... #"
 decrypted_tar="/app/backups/decrypted_backup.tar.gz"
-openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_source_tar" | \
 openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_source_tar" | \
   tar -xzf -
 
@@ -115,7 +119,7 @@ DEST_LATEST_BACKUP_JSON=$(find /app/backups/bw_export_*.json -type f -exec ls -t
 # Compare the source and destination JSON files and extract new entries
 echo "# Comparing source and destination JSON files... #"
 NEW_ENTRIES_FILE="/app/backups/new_entries.json"
-jq -s 'unique_by(.id) | .[0] + .[1]' $DEST_LATEST_BACKUP_JSON $SOURCE_OUTPUT_FILE_JSON > $NEW_ENTRIES_FILE
+jq -s 'unique_by(.id) | .[0] + .[1]' $DEST_LATEST_BACKUP_JSON $DEST_OUTPUT_FILE_JSON > $NEW_ENTRIES_FILE
 
 # Import the new entries
 echo "# Importing new entries... #"
@@ -123,6 +127,7 @@ bw --session $BW_SESSION_DEST --raw import bitwardenjson $NEW_ENTRIES_FILE
 
 # Cleanup
 rm -f $DEST_LATEST_BACKUP_JSON
+rm -f $DEST_OUTPUT_FILE_JSON
 rm -f $decrypted_tar
 rm -f $NEW_ENTRIES_FILE
 
