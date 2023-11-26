@@ -1,4 +1,4 @@
-# Bitwarden Sync
+# Bitwarden/Vaultwarden Sync
 
 🔐 backup and restore your Bitwarden vault between servers.
 
