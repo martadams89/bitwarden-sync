@@ -106,7 +106,8 @@ source_tar_password="$BW_TAR_PASS"
 echo "# Decrypting and extracting the latest backup... #"
 decrypted_tar="/app/backups/decrypted_backup.tar.gz"
 openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_source_tar" | \
-  tar -xzf - -C /app/backups/
+openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_source_tar" | \
+  tar -xzf -
 
 # Find the latest backup file
 DEST_LATEST_BACKUP_JSON=$(find /app/backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
