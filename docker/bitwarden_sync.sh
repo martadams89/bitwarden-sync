@@ -114,7 +114,7 @@ openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_so
   tar -xzf -
 
 # Find the latest backup file
-DEST_LATEST_BACKUP_JSON=$(find /app/backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
+DEST_LATEST_BACKUP_JSON=$(find /root/app/backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
 
 # Compare the source and destination JSON files and extract new entries
 echo "# Comparing source and destination JSON files... #"
