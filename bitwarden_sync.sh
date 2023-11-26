@@ -124,10 +124,14 @@ openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_so
 # Find the latest backup file
 DEST_LATEST_BACKUP_JSON=$(find backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
 
-# Compare the source and destination JSON files and extract new entries
+# Comparing source and destination JSON files and extract new entries
 echo "# Comparing source and destination JSON files... #"
-NEW_ENTRIES_FILE="backups/new_entries.json"
-jq -s 'unique_by(.id) | .[0] + .[1]' $DEST_LATEST_BACKUP_JSON $DEST_OUTPUT_FILE_JSON > $NEW_ENTRIES_FILE
+NEW_ENTRIES_FILE="/app/backups/new_entries.json"
+
+# Extract entries from the source JSON file that have IDs not present in the destination JSON file
+jq --argjson dest_ids "$(jq -r '.[].id' $DEST_LATEST_BACKUP_JSON | jq -sR 'split("\n")[:-1]' | jq -c -R -s 'unique')" \
+  --argjson src_ids "$(jq -r '.[].id' $SOURCE_OUTPUT_FILE_JSON | jq -sR 'split("\n")[:-1]' | jq -c -R -s 'unique')" \
+  'select(.id | IN($src_ids[]) | not)' $SOURCE_OUTPUT_FILE_JSON > $NEW_ENTRIES_FILE
 
 # Import the new entries
 echo "# Importing new entries... #"
