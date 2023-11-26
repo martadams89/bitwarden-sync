@@ -73,71 +73,56 @@ rm -f $SOURCE_OUTPUT_FILE_JSON
 
 ### Start of Restore
 
-# We want to remove itms later, so we set a base filename now
-DEST_EXPORT_OUTPUT_BASE="bw_vault_items_to_remove"
-TIMESTAMP=$(date "+%Y%m%d%H%M%S")
+# Restoring process
+echo "### Restore - Start ###"
+echo "# Start of Restore Process #"
 
-# Combine the items to remove file with timestamp, and use that as the filename
-DEST_OUTPUT_FILE=$EXPORT_OUTPUT_BASE$TIMESTAMP.json
+unset BW_CLIENTID
+unset BW_CLIENTSECRET
 
-# Lets make sure we're logged out before we get to work
+# Export/Restore to Destination Bitwarden
+export BW_CLIENTID=${BW_CLIENTID_DEST}
+export BW_CLIENTSECRET=${BW_CLIENTSECRET_DEST}
+
+# Logging out before work
+echo "# Logging out from Bitwarden... #"
 bw logout
 
-# Login to the server using our API key, and unlock the vault to get a session ID
+# Logging into the destination server
+echo "# Logging into Destination Bitwarden Server... #"
 bw config server $BW_SERVER_DEST
 bw login $BW_ACCOUNT_DEST --apikey --raw
 BW_SESSION_DEST=$(bw unlock $BW_PASS_DEST --raw)
 
-# Export what's currenty in the vault, so we can remove it
-bw --session $BW_SESSION_DEST --raw export --format json > $DEST_OUTPUT_FILE
-
-# Find and remove all folders, items, attachments and org collections
-for id in $(jq '.folders[]? | .id' $DEST_OUTPUT_FILE); do
-  # Remove quotes from the ID
-  id=$(sed 's/"//g' <<< "$id")
-  # Run your command here, replacing "$id" with the actual ID
-  bw --session $BW_SESSION_DEST --raw delete -p folder $id
-done
-
-# Find and remove all items
-for id in $(jq '.items[]? | .id' $DEST_OUTPUT_FILE); do
-  # Remove quotes from the ID
-  id=$(sed 's/"//g' <<< "$id")
-  # Run your command here, replacing "$id" with the actual ID
-  bw --session $BW_SESSION_DEST --raw delete -p item $id
-done
-
-# Find and remove all attachments
-for id in $(jq '.attachments[]? | .id' $DEST_OUTPUT_FILE); do
-  # Remove quotes from the ID
-  id=$(sed 's/"//g' <<< "$id")
-  # Run your command here, replacing "$id" with the actual ID
-  bw --session $BW_SESSION_DEST --raw delete -p attachment $id
-done
-
 # Find the latest backup file
-DEST_LATEST_BACKUP_TAR=$(find backups/bw_export_*.tar.gz.enc -type f -exec ls -t1 {} + | head -1)
+DEST_LATEST_BACKUP_TAR=$(find /app/backups/bw_export_*.tar.gz.enc -type f -exec ls -t1 {} + | head -1)
 
 # Set your encrypted file and password
 encrypted_source_tar="$DEST_LATEST_BACKUP_TAR"
 source_tar_password="$BW_TAR_PASS"
 
 # Decrypt the file and extract it
+echo "# Decrypting and extracting the latest backup... #"
+decrypted_tar="/app/backups/decrypted_backup.tar.gz"
 openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_source_tar" | \
-  tar -xzf -
-
-echo "Decompression completed successfully."
+  tar -xzf - -C /app/backups/
 
 # Find the latest backup file
-DEST_LATEST_BACKUP_JSON=$(find backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
+DEST_LATEST_BACKUP_JSON=$(find /app/backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
 
-# import the latest backup
-bw --session $BW_SESSION_DEST --raw import bitwardenjson $DEST_LATEST_BACKUP_JSON
+# Compare the source and destination JSON files and extract new entries
+echo "# Comparing source and destination JSON files... #"
+NEW_ENTRIES_FILE="/app/backups/new_entries.json"
+jq -s 'unique_by(.id) | .[0] + .[1]' $DEST_LATEST_BACKUP_JSON $SOURCE_OUTPUT_FILE_JSON > $NEW_ENTRIES_FILE
 
-# Clean up our item list to delete
-rm $DEST_OUTPUT_FILE
+# Import the new entries
+echo "# Importing new entries... #"
+bw --session $BW_SESSION_DEST --raw import bitwardenjson $NEW_ENTRIES_FILE
 
+# Cleanup
 rm -f $DEST_LATEST_BACKUP_JSON
+rm -f $decrypted_tar
+rm -f $NEW_ENTRIES_FILE
 
 ### End of Restore
 
