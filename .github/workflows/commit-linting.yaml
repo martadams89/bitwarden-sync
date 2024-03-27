@@ -14,8 +14,8 @@ permissions:
   pull-requests: read
 
 jobs:
-  if: github.base_ref == github.ref || !contains(fromJson('["prettier-code", "renovate/"]'),github.head_ref)
   commitlint:
+    if: github.base_ref == github.ref || !contains(fromJson('["prettier-code", "renovate/"]'),github.head_ref)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
