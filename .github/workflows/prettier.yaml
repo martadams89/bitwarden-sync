@@ -62,4 +62,4 @@ jobs:
           branch: prettier-code
           delete-branch: true
           commit-message: "style: prettier"
-          token: ${{ secrets.RENOVATE_TOKEN }}
+          token: ${{ secrets.PRETTIER }}
