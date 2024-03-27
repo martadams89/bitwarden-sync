@@ -22,7 +22,7 @@ jobs:
           docker buildx inspect --bootstrap
       - name: docker build docker
         env:
-          DOCKER_USERNAME: "${{ secrets.DOCKER_USERNAME }}"
+          DOCKER_USERNAME: '${{ secrets.DOCKER_USERNAME }}'
         run: |
           docker buildx build . -t $DOCKER_USERNAME/bitwarden-sync:dev -f docker/Dockerfile --platform linux/arm64,linux/arm/v6,linux/amd64 --push
 
