@@ -19,5 +19,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: actionlint
         uses: raven-actions/actionlint@v1
-        # env:
-        #   SHELLCHECK_OPTS: --exclude=SC2086
+        env:
+          SHELLCHECK_OPTS: --exclude=SC2086
