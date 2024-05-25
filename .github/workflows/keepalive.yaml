@@ -13,4 +13,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Keepalive Workflow
-        uses: gautamkrishnar/keepalive-workflow@latest
+        uses: liskin/gh-workflow-keepalive@latest
