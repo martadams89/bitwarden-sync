@@ -140,7 +140,7 @@ openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_so
 echo "# Decompression completed successfully. #"
 
 # Find the latest backup file
-DEST_LATEST_BACKUP_JSON=$(find /root/app/backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
+DEST_LATEST_BACKUP_JSON=$(find /app/backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
 
 # Import the latest backup
 echo "# Importing the latest backup... #"

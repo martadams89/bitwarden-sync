@@ -1,0 +1,41 @@
+name: Lint and Build
+
+on:
+  pull_request:
+    branches:
+      - "main"
+      - "release-please-**"
+  push:
+    branches:
+      - "*"
+    paths-ignore:
+      - README.md
+      - CHANGELOG.md
+      - version.txt
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  lint:
+    if: ${{ !startsWith(github.event.head_commit.message, 'docs') }} # skip on documentation
+    uses: ./.github/workflows/lint.yaml
+    secrets: inherit # pass all secrets to the called workflow
+
+  test:
+    if: ${{ !startsWith(github.event.head_commit.message, 'docs') }} # skip on documentation
+    uses: ./.github/workflows/test.yaml
+    needs: [lint]
+    secrets: inherit # pass all secrets to the called workflow
+
+  build:
+    if: ${{ !startsWith(github.event.head_commit.message, 'docs') }} # skip on documentation
+    uses: ./.github/workflows/reusable_docker-build-and-push.yaml
+    needs: [test]
+    secrets: inherit # pass all secrets to the called workflow
+    with:
+      # publish only on push to main or develop (releases are handled in another workflow)
+      publish: >-
+        ${{ github.event_name == 'push' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+      publish_dockerhub: >-
+        ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

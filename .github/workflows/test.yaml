@@ -1,0 +1,31 @@
+name: Test
+on:
+  workflow_call:
+
+jobs:
+  test:
+    name: Run test suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: netlog-viewer:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan Dockerfile vulnerabilities using Checkov
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: dockerfile
+          quiet: true # show only failed checks
+          container_user: 1000 # UID to run the container under to prevent permission issues

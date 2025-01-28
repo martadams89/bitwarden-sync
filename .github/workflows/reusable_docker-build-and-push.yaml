@@ -1,0 +1,135 @@
+name: Build And Push Docker image
+
+# When calling this workflow, ensure you use
+#   secrets: inherit
+# So the DOCKER_USERNAME and DOCKER_PASSWORD are available.
+
+on:
+  workflow_call:
+    inputs:
+      publish:
+        type: boolean
+        description: Whether to publish the image to Github Registry
+        required: false
+        default: true
+      publish_dockerhub:
+        type: boolean
+        description: |
+          Whether to publish the image to Docker Hub (only if publish=true).
+          Needs DOCKER_USERNAME and DOCKER_PASSWORD secrets (use secrets: inherit on the calling workflow).
+        required: false
+        default: true
+      version:
+        type: string
+        required: false
+        description: the string to extract semver labels from. If empty, the ref/tag will be used (if on.tag trigger).
+        default: ""
+  workflow_dispatch:
+    inputs:
+      publish:
+        type: boolean
+        description: Whether to publish the image to Github Registry
+        required: false
+        default: true
+      publish_dockerhub:
+        type: boolean
+        description: |
+          Whether to publish the image to Docker Hub (only if publish=true).
+          Needs DOCKER_USERNAME and DOCKER_PASSWORD secrets (use secrets: inherit on the calling workflow).
+        required: false
+        default: true
+      version:
+        type: string
+        required: false
+        description: the string to extract semver labels from. If empty, the ref/tag will be used (if on.tag trigger).
+        default: ""
+
+jobs:
+  build_and_push:
+    name: Docker Build and Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: vars_ver
+        run: echo "version=$(cat version.txt)" >> $GITHUB_OUTPUT
+      - name: Test output
+        run: echo ${{ steps.vars_ver.outputs.version }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
+            type=semver,pattern={{major}},value=${{ inputs.version }}
+            type=ref,event=branch
+            type=ref,event=branch,suffix=-{{ sha }}
+            type=ref,event=pr
+            type=raw,value=${{ github.ref_name }}-v${{ steps.vars_ver.outputs.version }}-b$${{ github.run_number }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+          flavor: |
+            latest=false
+
+      - name: Extract Docker metadata for Docker Hub
+        if: ${{ inputs.publish && inputs.publish_dockerhub }}
+        id: meta_dockerhub
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/${{ secrets.DOCKER_USERNAME }}/${{ github.event.repository.name }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
+            type=semver,pattern={{major}},value=${{ inputs.version }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+          flavor: |
+            latest=false
+
+      - name: Compute final image tags
+        id: tags
+        run: |
+          echo "tags<<EOF" >> $GITHUB_OUTPUT
+          echo '${{ steps.meta.outputs.tags }}' >> $GITHUB_OUTPUT
+          if [ 'true' == '${{ inputs.publish_dockerhub }}' ]; then
+            echo '${{ steps.meta_dockerhub.outputs.tags }}' >> $GITHUB_OUTPUT
+          fi
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: ${{ inputs.publish && inputs.publish_dockerhub }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64, linux/arm64
+          push: ${{ inputs.publish }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # use layer caching. Don't forget mode=max to also cache the build image
+          # (vs only the final image - mode: min)
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

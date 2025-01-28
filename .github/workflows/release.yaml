@@ -1,0 +1,43 @@
+name: Release Please
+on:
+  push:
+    branches:
+      - "main"
+  workflow_dispatch:
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          release-type: simple
+      - uses: actions/checkout@v4
+      - name: tag major and minor versions
+        if: ${{ steps.rp.outputs.release_created }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git remote add gh-token "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.event.repository.name }}.git"
+          git tag -d v${{ steps.rp.outputs.major }} || true
+          git tag -d v${{ steps.rp.outputs.major }}.${{ steps.rp.outputs.minor }} || true
+          git push origin :v${{ steps.rp.outputs.major }} || true
+          git push origin :v${{ steps.rp.outputs.major }}.${{ steps.rp.outputs.minor }} || true
+          git tag -a v${{ steps.rp.outputs.major }} -m "Release v${{ steps.rp.outputs.major }}"
+          git tag -a v${{ steps.rp.outputs.major }}.${{ steps.rp.outputs.minor }} -m "Release v${{ steps.rp.outputs.major }}.${{ steps.rp.outputs.minor }}"
+          git push origin v${{ steps.rp.outputs.major }}
+          git push origin v${{ steps.rp.outputs.major }}.${{ steps.rp.outputs.minor }}
+
+  publish-docker-image:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    uses: ./.github/workflows/reusable_docker-build-and-push.yaml
+    secrets: inherit # pass all secrets to the called workflow
+    with:
+      publish: true
+      publish_dockerhub: false
+      version: ${{ needs.release-please.outputs.tag }}
