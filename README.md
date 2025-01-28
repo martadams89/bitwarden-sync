@@ -1,14 +1,16 @@
-# Bitwarden Sync
+# Bitwarden/Vaultwarden Sync
 
 🔐 backup and restore your Bitwarden vault between servers.
+
+### [You will need your API Keys](https://bitwarden.com/help/personal-api-key/)
+
+### NOTE: This does not currently sync Orgnisations or multiple users.
 
 ## Using Docker? See [docker-compose.yml](https://github.com/martadams89/bitwarden-sync/blob/main/docker/docker-compose.yml)
 
 ## Pre-Task: Set Up Passwords and Keyfiles
 
 ### Bitwarden CLI must be already installed
-
-### [You will need your API Keys](https://bitwarden.com/help/personal-api-key/)
 
 Before running the backup and restore scripts, you need to set up your passwords and keyfiles securely.
 
@@ -46,7 +48,7 @@ rm -f bitwarden_restore_password
 
 ### Instructions
 
-1. Open `bitwarden_backup_and_restore.sh` and set your Bitwarden server details and API information in the environment variables at the top of the script.
+1. Open `bitwarden_sync.sh` and set your Bitwarden server details and API information in the environment variables at the top of the script.
 
 ```bash
 export BW_TAR_PASS=$(openssl enc -d -aes-256-cbc -in bitwarden_backup_password.enc -pass file:bitwarden_backup_keyfile)
@@ -75,7 +77,7 @@ chmod +x bitwarden_backup_and_restore.sh
 3. Run the script.
 
 ```
-./bitwarden_backup_and_restore.sh
+./bitwarden_sync.sh
 ```
 
 #### NOTE: Restoring will take awhile as it purges the vault

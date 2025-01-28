@@ -19,7 +19,7 @@ jobs:
       # Give the default GITHUB_TOKEN write permission to commit and push the
       # added or changed files to the repository.
       contents: write
-      pull-requests: write
+      pull-requests: read
       actions: write
     steps:
       - name: Checkout
@@ -30,6 +30,21 @@ jobs:
           # This is important to fetch the changes to the previous commit
           fetch-depth: 0
           token: ${{ secrets.PRETTIER }}
+
+      # - name: Install yarn
+      #   uses: borales/actions-yarn@v5
+      #   with:
+      #     cmd: install # will run `yarn install` command
+
+      # - name: Install Prettier
+      #   uses: borales/actions-yarn@v5
+      #   with:
+      #     cmd: add --dev --exact prettier
+
+      # - name: Run prettier
+      #   uses: borales/actions-yarn@v5
+      #   with:
+      #     cmd: prettier --write . --ignore-path .prettierignore --ignore-unknown
 
       - name: Prettify code
         uses: creyD/prettier_action@v4.3
