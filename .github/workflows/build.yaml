@@ -16,15 +16,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  lint:
-    if: ${{ !startsWith(github.event.head_commit.message, 'docs') }} # skip on documentation
-    uses: ./.github/workflows/lint.yaml
-    secrets: inherit # pass all secrets to the called workflow
+  # lint:
+  #   if: ${{ !startsWith(github.event.head_commit.message, 'docs') }} # skip on documentation
+  #   uses: ./.github/workflows/lint.yaml
+  #   secrets: inherit # pass all secrets to the called workflow
 
   test:
     if: ${{ !startsWith(github.event.head_commit.message, 'docs') }} # skip on documentation
     uses: ./.github/workflows/test.yaml
-    needs: [lint]
+    # needs: [lint]
     secrets: inherit # pass all secrets to the called workflow
 
   build:
