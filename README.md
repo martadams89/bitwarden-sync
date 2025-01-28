@@ -45,6 +45,7 @@ rm -f bitwarden_restore_password
 ## Backup and Restore Script
 
 ### Instructions
+
 1. Open `bitwarden_backup_and_restore.sh` and set your Bitwarden server details and API information in the environment variables at the top of the script.
 
 ```bash
@@ -66,11 +67,13 @@ export BW_SERVER_DEST=https://vault.bitwarden.com
 ```
 
 2. Make the script executable
+
 ```
 chmod +x bitwarden_backup_and_restore.sh
 ```
 
 3. Run the script.
+
 ```
 ./bitwarden_backup_and_restore.sh
 ```
