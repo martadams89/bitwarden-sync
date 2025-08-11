@@ -18,5 +18,5 @@ jobs:
     if: github.base_ref == github.ref || !contains(fromJson('["prettier-code", "renovate/"]'),github.head_ref)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: wagoid/commitlint-github-action@v6
