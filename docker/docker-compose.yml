@@ -6,20 +6,47 @@ services:
     restart: always
     environment:
       - CRON_SCHEDULE=0 0 * * *
-      - BW_TAR_PASS=mysecuretarpassword
+
+      # ── Password options (choose ONE method per secret) ──────────────────────
+      #
+      # Option A – Plaintext (simplest, least secure)
+      - BW_TAR_PASS=CHANGEME
+      - BW_PASS_SOURCE=CHANGEME
+      - BW_PASS_DEST=CHANGEME
+      #
+      # Option B – Docker secrets / plain-text file
+      #   Mount a file containing only the password and point to it.
+      #   e.g.  echo 'mypassword' > /run/secrets/bw_pass_source
+      # - BW_TAR_PASS_FILE=/run/secrets/bw_tar_pass
+      # - BW_PASS_SOURCE_FILE=/run/secrets/bw_pass_source
+      # - BW_PASS_DEST_FILE=/run/secrets/bw_pass_dest
+      #
+      # Option C – OpenSSL-encrypted files (same approach as the standalone script)
+      #   Generate with:
+      #     openssl rand -base64 32 > /secrets/bw_source.key
+      #     echo 'mypassword' | openssl enc -aes-256-cbc -salt \
+      #       -out /secrets/bw_source_pass.enc -pass file:/secrets/bw_source.key
+      #   Then set these pairs of variables (and mount the files below):
+      # - BW_TAR_PASS_ENC_FILE=/secrets/bw_tar_pass.enc
+      # - BW_TAR_PASS_KEYFILE=/secrets/bw_tar.key
+      # - BW_PASS_SOURCE_ENC_FILE=/secrets/bw_source_pass.enc
+      # - BW_PASS_SOURCE_KEYFILE=/secrets/bw_source.key
+      # - BW_PASS_DEST_ENC_FILE=/secrets/bw_dest_pass.enc
+      # - BW_PASS_DEST_KEYFILE=/secrets/bw_dest.key
+      # ─────────────────────────────────────────────────────────────────────────
+
       - BW_ACCOUNT_SOURCE=mybitwardensource@email.com
-      - BW_PASS_SOURCE=mybitwardensourcepassword
       - BW_CLIENTID_SOURCE=user.32323232-3232323-232323-3232323-32323232
       - BW_CLIENTSECRET_SOURCE=FdfdfdfdfdfdfFfdfdffdfdfd
       - BW_SERVER_SOURCE=https://vault.mydomain.com
       - BW_ACCOUNT_DEST=mybitwardendest@email.com
-      - BW_PASS_DEST=mybitwardendestpassword
       - BW_CLIENTID_DEST=user.1221212-121212-12121-12121
       - BW_CLIENTSECRET_DEST=Dsfdfdfdfdfdfdfdfdfgfdfdfds
       - BW_SERVER_DEST=https://vault.bitwarden.com
       # Optional Healthcheck IO Integration
       - HEALTHCHECK_URL=https://healtcheck.url.com/ping
       - HEALTHCHECK_PING=1234343r3fadgsdgs
-      # Optional bind mount encrypted backups
     volumes:
       - ./config/backups:/app/backups
+      # Mount your encrypted secret files here when using Option B or C, e.g.:
+      # - /path/to/secrets:/secrets:ro

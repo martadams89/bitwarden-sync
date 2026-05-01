@@ -8,6 +8,73 @@
 
 ## Using Docker? See [docker-compose.yml](https://github.com/martadams89/bitwarden-sync/blob/main/docker/docker-compose.yml)
 
+### Docker – Encrypted Passwords
+
+Storing passwords as plaintext environment variables is convenient but not ideal.
+The Docker image supports the same encrypted-file approach used by the standalone
+script, as well as Docker secrets. Configure each password variable using **one**
+of the three methods below (in decreasing order of security):
+
+#### Option A – Plaintext environment variable (default)
+
+```yaml
+environment:
+  - BW_PASS_SOURCE=mypassword
+  - BW_PASS_DEST=mypassword
+  - BW_TAR_PASS=mytarpassword
+```
+
+#### Option B – Docker secret / plain-text file
+
+Mount a file that contains only the password (e.g. via Docker secrets or a bind
+mount) and point to it with a `_FILE` variable:
+
+```bash
+# Create a secret file
+echo 'mypassword' > /run/secrets/bw_pass_source
+```
+
+```yaml
+environment:
+  - BW_PASS_SOURCE_FILE=/run/secrets/bw_pass_source
+  - BW_PASS_DEST_FILE=/run/secrets/bw_pass_dest
+  - BW_TAR_PASS_FILE=/run/secrets/bw_tar_pass
+volumes:
+  - /run/secrets:/run/secrets:ro
+```
+
+#### Option C – OpenSSL-encrypted files (matches the standalone script)
+
+Generate an encrypted file and a keyfile for each password:
+
+```bash
+# Generate a keyfile
+openssl rand -base64 32 > /secrets/bw_source.key
+chmod 400 /secrets/bw_source.key
+
+# Encrypt the password
+echo 'mypassword' | openssl enc -aes-256-cbc -salt \
+  -out /secrets/bw_source_pass.enc -pass file:/secrets/bw_source.key
+```
+
+Then point the container to both files with `_ENC_FILE` and `_KEYFILE` variables:
+
+```yaml
+environment:
+  - BW_PASS_SOURCE_ENC_FILE=/secrets/bw_source_pass.enc
+  - BW_PASS_SOURCE_KEYFILE=/secrets/bw_source.key
+  - BW_PASS_DEST_ENC_FILE=/secrets/bw_dest_pass.enc
+  - BW_PASS_DEST_KEYFILE=/secrets/bw_dest.key
+  - BW_TAR_PASS_ENC_FILE=/secrets/bw_tar_pass.enc
+  - BW_TAR_PASS_KEYFILE=/secrets/bw_tar.key
+volumes:
+  - /secrets:/secrets:ro
+```
+
+> **Priority:** if both `_ENC_FILE`/`_KEYFILE` and `_FILE` are set for the same
+> variable, the encrypted-file method takes precedence. If neither is set, the
+> plaintext variable is used (backward-compatible).
+
 ## Pre-Task: Set Up Passwords and Keyfiles
 
 ### Bitwarden CLI must be already installed

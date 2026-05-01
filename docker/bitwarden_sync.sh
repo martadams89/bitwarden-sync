@@ -1,5 +1,53 @@
 #!/bin/bash
 
+# Helper: resolve a password/secret from (in priority order):
+#   1. An OpenSSL-encrypted file + keyfile  ({VAR}_ENC_FILE and {VAR}_KEYFILE)
+#   2. A plain-text file (Docker secret)    ({VAR}_FILE)
+#   3. A plain-text environment variable    ({VAR})
+resolve_secret() {
+  local var_name="$1"
+  local enc_file_var="${var_name}_ENC_FILE"
+  local keyfile_var="${var_name}_KEYFILE"
+  local file_var="${var_name}_FILE"
+
+  local enc_file_val="${!enc_file_var}"
+  local keyfile_val="${!keyfile_var}"
+  local file_val="${!file_var}"
+  local plain_val="${!var_name}"
+
+  if [ -n "$enc_file_val" ] && [ -n "$keyfile_val" ]; then
+    if [ ! -f "$enc_file_val" ]; then
+      echo "ERROR: Encrypted file not found: $enc_file_val" >&2
+      exit 1
+    fi
+    if [ ! -f "$keyfile_val" ]; then
+      echo "ERROR: Keyfile not found: $keyfile_val" >&2
+      exit 1
+    fi
+    local decrypted
+    decrypted=$(openssl enc -d -aes-256-cbc -in "$enc_file_val" -pass file:"$keyfile_val" 2>&1)
+    if [ $? -ne 0 ]; then
+      echo "ERROR: Failed to decrypt $enc_file_val: $decrypted" >&2
+      exit 1
+    fi
+    echo "$decrypted"
+  elif [ -n "$file_val" ]; then
+    if [ ! -r "$file_val" ]; then
+      echo "ERROR: Secret file not found or not readable: $file_val" >&2
+      exit 1
+    fi
+    cat "$file_val"
+  else
+    echo "$plain_val"
+  fi
+}
+
+# Resolve sensitive values – supports plaintext env vars, plain files (Docker
+# secrets), or OpenSSL-encrypted files, depending on what is configured.
+BW_TAR_PASS=$(resolve_secret BW_TAR_PASS)
+BW_PASS_SOURCE=$(resolve_secret BW_PASS_SOURCE)
+BW_PASS_DEST=$(resolve_secret BW_PASS_DEST)
+
 # Set start time
 START_TIME=$(date)
 echo "### Bitwarden Script - Start ###"
