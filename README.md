@@ -72,7 +72,7 @@ volumes:
 ```
 
 > **Priority:** if both `_ENC_FILE`/`_KEYFILE` and `_FILE` are set for the same
-> variable, the encrypted-file method takes precedence.  If neither is set, the
+> variable, the encrypted-file method takes precedence. If neither is set, the
 > plaintext variable is used (backward-compatible).
 
 ## Pre-Task: Set Up Passwords and Keyfiles
