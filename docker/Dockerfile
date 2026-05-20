@@ -12,7 +12,8 @@ ENV NODE_OPTIONS="--no-deprecation"
 
 # Install both versions of Bitwarden CLI in separate locations
 RUN npm install -g semver && \
-    npm install -g @bitwarden/cli@2024.9.0 && \
+    # npm install -g @bitwarden/cli@2024.9.0 && \
+    npm install -g @bitwarden/cli && \
     mkdir -p /opt/bw-old && \
     cp -r /usr/local/lib/node_modules/@bitwarden/cli /opt/bw-old/ && \
     cp -r /usr/local/lib/node_modules /opt/bw-old/node_modules && \
