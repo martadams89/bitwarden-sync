@@ -147,17 +147,37 @@ chmod +x bitwarden_backup_and_restore.sh
 ./bitwarden_sync.sh
 ```
 
-#### NOTE: Restoring will take awhile as it purges the vault
-
-### The backup will be stored as a tar in the `backups` folder with a timestamped filename.
+### The backup will be stored as an encrypted tar in the `backups` folder with a timestamped filename.
 
 ## Cron Job Setup
 
-Add the following cron job entry to run the script every 6 interval:
+Add the following cron job entry to run the script every 6 hours:
 
 ```bash
-# Run backup every 6 hours with a 10-minute interval
-0 */6 * * * /path/to/bitwarden_backup_and_restore.sh > /dev/null 2&>1
+0 */6 * * * /path/to/bitwarden_sync.sh > /dev/null 2>&1
 ```
+
+## How the Restore Works
+
+The restore process uses the **Bitwarden REST API** to clear the destination vault (rather than per-item CLI calls), then imports the full backup in a single operation:
+
+1. Authenticates with the Bitwarden identity server using your API key to obtain an access token
+2. Fetches all existing cipher and folder IDs via `/sync`
+3. Bulk-deletes existing ciphers in batches of 500 via `DELETE /ciphers` (soft-delete; Bitwarden auto-purges trash after 30 days)
+4. Deletes existing folders individually via `DELETE /folders/{id}`
+5. Imports the full backup using `bw import bitwardenjson` in a single call
+
+This approach is compatible with **Bitwarden CLI 2026.x**, which introduced a master-password re-prompt requirement for all vault data operations. The import uses a PTY (`script`) to satisfy the single prompt automatically.
+
+## Optional: Testing with a Subset
+
+Set `BW_IMPORT_LIMIT=N` to import only N items per type (login, secure note, card, identity) instead of the full vault. Useful for validating your setup before running a full sync:
+
+```yaml
+environment:
+  - BW_IMPORT_LIMIT=1
+```
+
+Remove the variable (or leave it unset) for a full sync.
 
 🚀 Your Bitwarden Backup and Restore setup is now complete!

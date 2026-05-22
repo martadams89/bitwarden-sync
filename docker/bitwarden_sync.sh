@@ -25,7 +25,7 @@ resolve_secret() {
       exit 1
     fi
     local decrypted
-    decrypted=$(openssl enc -d -aes-256-cbc -in "$enc_file_val" -pass file:"$keyfile_val" 2>&1)
+    decrypted=$(openssl enc -d -aes-256-cbc -in "$enc_file_val" -pass file:"$keyfile_val" 2>/dev/null)
     if [ $? -ne 0 ]; then
       echo "ERROR: Failed to decrypt $enc_file_val: $decrypted" >&2
       exit 1
@@ -103,7 +103,7 @@ bw-old config server $BW_SERVER_SOURCE
 bw-old login --apikey
 
 echo "# Unlocking the vault... #"
-BW_SESSION_SOURCE=$(bw-old unlock $BW_PASS_SOURCE --raw)
+BW_SESSION_SOURCE=$(bw-old unlock "$BW_PASS_SOURCE" --raw)
 
 if [ -z "$BW_SESSION_SOURCE" ]; then
   echo "# ERROR: Failed to unlock source vault #"
@@ -117,7 +117,7 @@ bw-old --session $BW_SESSION_SOURCE --raw export --format json > $SOURCE_OUTPUT_
 # Add file to encrypted tar
 file_to_compress="$SOURCE_OUTPUT_FILE_JSON"
 tar -czf - "$file_to_compress" | \
-  openssl enc -aes-256-cbc -pass pass:"$BW_TAR_PASS" -out "/app/backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.tar.gz.enc"
+  openssl enc -aes-256-cbc -pbkdf2 -pass pass:"$BW_TAR_PASS" -out "/app/backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.tar.gz.enc"
 
 # Cleanup
 rm -f $SOURCE_OUTPUT_FILE_JSON
@@ -138,10 +138,6 @@ unset BW_CLIENTSECRET
 export BW_CLIENTID=${BW_CLIENTID_DEST}
 export BW_CLIENTSECRET=${BW_CLIENTSECRET_DEST}
 
-# We want to remove items later, so we set a base filename now
-DEST_EXPORT_OUTPUT_BASE="bw_vault_items_to_remove"
-DEST_OUTPUT_FILE=$DEST_EXPORT_OUTPUT_BASE$TIMESTAMP.json
-
 # Logging out before work
 echo "# Logging out from Bitwarden... #"
 bw-new logout 2>/dev/null || true
@@ -152,63 +148,113 @@ bw-new logout 2>/dev/null || true
 bw-new config server $BW_SERVER_DEST
 bw-new login --apikey
 
-BW_SESSION_DEST=$(bw-new unlock $BW_PASS_DEST --raw)
+BW_SESSION_DEST=$(bw-new unlock "$BW_PASS_DEST" --raw)
 
 if [ -z "$BW_SESSION_DEST" ]; then
   echo "# ERROR: Failed to unlock destination vault #"
   exit 1
 fi
 
-# Export what's currently in the vault, so we can remove it
-echo "# Exporting current items from destination vault... #"
-bw-new --session $BW_SESSION_DEST --raw export --format json > $DEST_OUTPUT_FILE
-
-# Find and remove all folders, items, attachments, and org collections
-echo "# Removing items from the destination vault... This might take some time. #"
-
-for id in $(jq '.folders[]? | .id' $DEST_OUTPUT_FILE); do
-  id=$(sed 's/"//g' <<< "$id")
-  bw-new --session $BW_SESSION_DEST --raw delete -p folder $id
-done
-
-# Find and remove all items
-for id in $(jq '.items[]? | .id' $DEST_OUTPUT_FILE); do
-  id=$(sed 's/"//g' <<< "$id")
-  bw-new --session $BW_SESSION_DEST --raw delete -p item $id
-done
-
-# Find and remove all attachments
-for id in $(jq '.attachments[]? | .id' $DEST_OUTPUT_FILE); do
-  id=$(sed 's/"//g' <<< "$id")
-  bw-new --session $BW_SESSION_DEST --raw delete -p attachment $id
-done
-
-echo "# Item removal completed. #"
-
-# Find the latest backup file
+# Find and decrypt the latest backup
 DEST_LATEST_BACKUP_TAR=$(find /app/backups/bw_export_*.tar.gz.enc -type f -exec ls -t1 {} + | head -1)
-
-# Set your encrypted file and password
-encrypted_source_tar="$DEST_LATEST_BACKUP_TAR"
-source_tar_password="$BW_TAR_PASS"
-
-# Decrypt the file and extract it
 echo "# Decrypting and extracting the latest backup... #"
-openssl enc -d -aes-256-cbc -pass pass:"$source_tar_password" -in "$encrypted_source_tar" | \
-  tar -xzf -
-
-echo "# Decompression completed successfully. #"
-
-# Find the latest backup file
+openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$BW_TAR_PASS" -in "$DEST_LATEST_BACKUP_TAR" | \
+  tar -xzf - -C /root
 DEST_LATEST_BACKUP_JSON=$(find /root/app/backups/bw_export_*.json -type f -exec ls -t1 {} + | head -1)
+echo "# Backup: $(jq '.items | length' "$DEST_LATEST_BACKUP_JSON") items, $(jq '.folders | length' "$DEST_LATEST_BACKUP_JSON") folders #"
 
-# Import the latest backup
-echo "# Importing the latest backup... #"
-bw-new --session $BW_SESSION_DEST --raw import bitwardenjson $DEST_LATEST_BACKUP_JSON
+# If BW_IMPORT_LIMIT is set, truncate to N items (one of each type) for testing
+if [ -n "$BW_IMPORT_LIMIT" ]; then
+  echo "# TEST MODE: Limiting import to $BW_IMPORT_LIMIT items per type #"
+  jq --argjson n "$BW_IMPORT_LIMIT" '
+    .items |= (group_by(.type) | map(.[0:$n]) | add // [])
+  ' "$DEST_LATEST_BACKUP_JSON" > "${DEST_LATEST_BACKUP_JSON}.tmp" && \
+    mv "${DEST_LATEST_BACKUP_JSON}.tmp" "$DEST_LATEST_BACKUP_JSON"
+  echo "# Test import: $(jq '.items | length' "$DEST_LATEST_BACKUP_JSON") items #"
+fi
 
-# Clean up our item list to delete
-rm $DEST_OUTPUT_FILE
-rm -f $DEST_LATEST_BACKUP_JSON
+# Clear the destination vault via Bitwarden REST API (no PTY/CLI needed for deletion).
+# Bulk-deleting via API is orders of magnitude faster than per-item bw-new calls.
+echo "# Getting API access token... #"
+API_TOKEN=$(curl -sf -X POST "https://identity.bitwarden.com/connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "Bitwarden-Client-Version: 2026.4.1" \
+  -H "Bitwarden-Client-Name: cli" \
+  --data-urlencode "grant_type=client_credentials" \
+  --data-urlencode "scope=api" \
+  --data-urlencode "client_id=${BW_CLIENTID_DEST}" \
+  --data-urlencode "client_secret=${BW_CLIENTSECRET_DEST}" \
+  --data-urlencode "deviceType=8" \
+  --data-urlencode "deviceIdentifier=$(uuidgen)" \
+  --data-urlencode "deviceName=bitwarden-sync" \
+  | jq -r '.access_token // empty')
+
+if [ -z "$API_TOKEN" ]; then
+  echo "# ERROR: Failed to get Bitwarden API access token #"
+  rm -f "$DEST_LATEST_BACKUP_JSON"
+  exit 1
+fi
+echo "# API token obtained #"
+
+echo "# Fetching existing vault contents... #"
+SYNC_DATA=$(curl -sf "https://api.bitwarden.com/sync?excludeDomains=true" \
+  -H "Authorization: Bearer $API_TOKEN")
+
+# Extract IDs — sync response uses lowercase keys; skip org ciphers (organizationId != null)
+CIPHER_IDS=$(printf '%s' "$SYNC_DATA" | \
+  jq '[.ciphers[]? | select(.organizationId == null) | .id] | map(select(. != null))' 2>/dev/null || echo '[]')
+FOLDER_IDS=$(printf '%s' "$SYNC_DATA" | \
+  jq '[.folders[]?.id | select(. != null and . != "")]' 2>/dev/null || echo '[]')
+CIPHER_COUNT=$(printf '%s' "$CIPHER_IDS" | jq 'length')
+FOLDER_COUNT=$(printf '%s' "$FOLDER_IDS" | jq 'length')
+echo "# Existing destination: $CIPHER_COUNT ciphers, $FOLDER_COUNT folders #"
+
+# Bulk delete all personal ciphers in batches of 500 (API limit)
+# Soft-delete only; Bitwarden auto-purges trash after 30 days
+if [ "$CIPHER_COUNT" -gt 0 ]; then
+  echo "# Bulk deleting $CIPHER_COUNT ciphers (batches of 500)... #"
+  OFFSET=0
+  TOTAL_DELETED=0
+  while true; do
+    BATCH=$(printf '%s' "$CIPHER_IDS" | jq ".[${OFFSET}:$((OFFSET+500))]")
+    BATCH_SIZE=$(printf '%s' "$BATCH" | jq 'length')
+    [ "$BATCH_SIZE" -eq 0 ] && break
+    STATUS=$(curl -sf -X DELETE "https://api.bitwarden.com/ciphers" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "{\"ids\": $BATCH}" \
+      -w "%{http_code}" -o /dev/null 2>/dev/null)
+    TOTAL_DELETED=$((TOTAL_DELETED + BATCH_SIZE))
+    echo "# Deleted batch $TOTAL_DELETED/$CIPHER_COUNT (HTTP $STATUS) #"
+    OFFSET=$((OFFSET + 500))
+  done
+fi
+
+# Delete folders individually (no bulk endpoint)
+printf '%s' "$FOLDER_IDS" | jq -r '.[]' 2>/dev/null | while read -r id; do
+  [ -z "$id" ] && continue
+  STATUS=$(curl -sf -X DELETE "https://api.bitwarden.com/folders/$id" \
+    -H "Authorization: Bearer $API_TOKEN" \
+    -w "%{http_code}" -o /dev/null 2>/dev/null)
+  echo "# Deleted folder $id (HTTP $STATUS) #"
+done
+
+# Import via a single PTY call — bw import prompts for master password exactly once
+echo "# Importing backup into destination vault... #"
+IMPORT_OUT=$(printf "%s\n" "$BW_PASS_DEST" | \
+  script -qfc "bw-new --session \"$BW_SESSION_DEST\" import bitwardenjson \"$DEST_LATEST_BACKUP_JSON\"" \
+  /dev/null 2>/dev/null | tr -d '\r' | sed 's/\x1b\[[0-9;]*[A-Za-z]//g')
+
+# Show only meaningful lines — filter echoed password, prompt noise, and blanks
+printf '%s\n' "$IMPORT_OUT" | grep -vF "$BW_PASS_DEST" | grep -v '^. Master password' | grep -v '^[[:space:]]*$'
+
+if ! printf '%s\n' "$IMPORT_OUT" | grep -qi "imported"; then
+  echo "# ERROR: Import did not complete #"
+  rm -f "$DEST_LATEST_BACKUP_JSON"
+  exit 1
+fi
+
+rm -f "$DEST_LATEST_BACKUP_JSON"
 
 echo "# End of Restore Process #"
 echo "### Restore - End ###"
