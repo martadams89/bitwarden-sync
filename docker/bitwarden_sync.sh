@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Persist Bitwarden CLI state to keep a stable device identity between runs.
+export BITWARDENCLI_APPDATA_DIR="${BITWARDENCLI_APPDATA_DIR:-/app/data/bitwarden-cli}"
+mkdir -p "$BITWARDENCLI_APPDATA_DIR"
+
 # Helper: resolve a password/secret from (in priority order):
 #   1. An OpenSSL-encrypted file + keyfile  ({VAR}_ENC_FILE and {VAR}_KEYFILE)
 #   2. A plain-text file (Docker secret)    ({VAR}_FILE)
