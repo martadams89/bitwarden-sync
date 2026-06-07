@@ -8,6 +8,22 @@
 
 ## Using Docker? See [docker-compose.yml](https://github.com/martadams89/bitwarden-sync/blob/main/docker/docker-compose.yml)
 
+### Docker – Persist Bitwarden CLI state (prevents "new Linux client" emails)
+
+Bitwarden Cloud can send a "new client logged in" email if the container starts
+with a fresh CLI state every run. Persist the CLI app-data directory so the same
+device identity is reused:
+
+```yaml
+environment:
+  - BITWARDENCLI_APPDATA_DIR=/app/data/bitwarden-cli
+volumes:
+  - ./config/bitwarden-cli:/app/data/bitwarden-cli
+```
+
+If you already mount `./config/backups`, add the `bitwarden-cli` mount alongside
+it and keep that directory between container restarts.
+
 ### Docker – Encrypted Passwords
 
 Storing passwords as plaintext environment variables is convenient but not ideal.

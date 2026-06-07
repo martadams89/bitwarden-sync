@@ -6,6 +6,8 @@ services:
     restart: always
     environment:
       - CRON_SCHEDULE=0 0 * * *
+      # Optional override for CLI app data location (default shown)
+      - BITWARDENCLI_APPDATA_DIR=/app/data/bitwarden-cli
 
       # ── Password options (choose ONE method per secret) ──────────────────────
       #
@@ -48,5 +50,6 @@ services:
       - HEALTHCHECK_PING=1234343r3fadgsdgs
     volumes:
       - ./config/backups:/app/backups
+      - ./config/bitwarden-cli:/app/data/bitwarden-cli
       # Mount your encrypted secret files here when using Option B or C, e.g.:
       # - /path/to/secrets:/secrets:ro
