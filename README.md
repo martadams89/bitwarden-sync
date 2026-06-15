@@ -168,14 +168,32 @@ export BW_CLIENTSECRET_DEST=XXXX
 export BW_SERVER_DEST=https://vault.bitwarden.com
 ```
 
-Both sync scripts derive destination REST endpoints from `BW_SERVER_DEST`.
-Self-hosted Bitwarden and Vaultwarden servers use
-`$BW_SERVER_DEST/api` and `$BW_SERVER_DEST/identity`. Bitwarden Cloud
-automatically uses its separate `api.bitwarden.com` and
-`identity.bitwarden.com` services (and likewise for the `.eu` service).
+The restore uses **both** destination endpoints:
 
-For deployments with non-standard endpoint URLs, set either or both optional
-overrides:
+- **Identity endpoint:** authenticates the destination API key and returns an
+  access token.
+- **API endpoint:** uses the access token to fetch (`/sync`) and delete
+  destination vault contents.
+
+Users normally set only `BW_SERVER_DEST`. Both sync scripts derive the correct
+identity and API endpoints from it:
+
+| Destination | `BW_SERVER_DEST` example | API endpoint | Identity/token endpoint |
+| --- | --- | --- | --- |
+| Vaultwarden | `https://vault.example.com` | `https://vault.example.com/api` | `https://vault.example.com/identity` |
+| Self-hosted official Bitwarden | `https://vault.example.com` | `https://vault.example.com/api` | `https://vault.example.com/identity` |
+| Bitwarden Cloud US | `https://vault.bitwarden.com` | `https://api.bitwarden.com` | `https://identity.bitwarden.com` |
+| Bitwarden Cloud EU | `https://vault.bitwarden.eu` | `https://api.bitwarden.eu` | `https://identity.bitwarden.eu` |
+
+For example, when restoring to Vaultwarden at
+`https://vaultwarden.example.com`, the script sends the login/token request to
+`https://vaultwarden.example.com/identity/connect/token`, then sends sync and
+deletion requests to `https://vaultwarden.example.com/api`.
+
+Do not set `BW_API_URL_DEST` or `BW_IDENTITY_URL_DEST` for a standard
+Vaultwarden, self-hosted Bitwarden, or Bitwarden Cloud installation. Set an
+override only when a non-standard reverse proxy exposes that service at a
+different URL:
 
 ```bash
 export BW_API_URL_DEST=https://vaultwarden.example.com/api

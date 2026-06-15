@@ -49,8 +49,25 @@ services:
       - BW_CLIENTID_DEST=user.1221212-121212-12121-12121
       - BW_CLIENTSECRET_DEST=Dsfdfdfdfdfdfdfdfdfgfdfdfds
       - BW_SERVER_DEST=https://vault.bitwarden.com
-      # Optional for non-standard deployments. Defaults are derived from
-      # BW_SERVER_DEST as <server>/api and <server>/identity.
+      #
+      # Both destination endpoints are used:
+      #   Identity endpoint: logs in with the API key and obtains an access token.
+      #   API endpoint: uses that token to sync and delete vault contents.
+      #
+      # Normally set only BW_SERVER_DEST; the script derives both endpoints:
+      # Vaultwarden / self-hosted Bitwarden:
+      #   BW_SERVER_DEST=https://vault.example.com
+      #   API:      https://vault.example.com/api
+      #   Identity: https://vault.example.com/identity
+      # Bitwarden Cloud US:
+      #   BW_SERVER_DEST=https://vault.bitwarden.com
+      #   API:      https://api.bitwarden.com
+      #   Identity: https://identity.bitwarden.com
+      # Bitwarden Cloud EU uses the equivalent .eu hostnames.
+      #
+      # Do not set these overrides for a standard Vaultwarden, self-hosted
+      # Bitwarden, or Bitwarden Cloud installation. They are only for
+      # non-standard reverse proxies where the derived URLs above are wrong:
       # - BW_API_URL_DEST=https://vault.mydomain.com/api
       # - BW_IDENTITY_URL_DEST=https://vault.mydomain.com/identity
       # Optional Healthcheck IO Integration
