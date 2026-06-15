@@ -178,12 +178,12 @@ The restore uses **both** destination endpoints:
 Users normally set only `BW_SERVER_DEST`. Both sync scripts derive the correct
 identity and API endpoints from it:
 
-| Destination | `BW_SERVER_DEST` example | API endpoint | Identity/token endpoint |
-| --- | --- | --- | --- |
-| Vaultwarden | `https://vault.example.com` | `https://vault.example.com/api` | `https://vault.example.com/identity` |
-| Self-hosted official Bitwarden | `https://vault.example.com` | `https://vault.example.com/api` | `https://vault.example.com/identity` |
-| Bitwarden Cloud US | `https://vault.bitwarden.com` | `https://api.bitwarden.com` | `https://identity.bitwarden.com` |
-| Bitwarden Cloud EU | `https://vault.bitwarden.eu` | `https://api.bitwarden.eu` | `https://identity.bitwarden.eu` |
+| Destination                    | `BW_SERVER_DEST` example      | API endpoint                    | Identity/token endpoint              |
+| ------------------------------ | ----------------------------- | ------------------------------- | ------------------------------------ |
+| Vaultwarden                    | `https://vault.example.com`   | `https://vault.example.com/api` | `https://vault.example.com/identity` |
+| Self-hosted official Bitwarden | `https://vault.example.com`   | `https://vault.example.com/api` | `https://vault.example.com/identity` |
+| Bitwarden Cloud US             | `https://vault.bitwarden.com` | `https://api.bitwarden.com`     | `https://identity.bitwarden.com`     |
+| Bitwarden Cloud EU             | `https://vault.bitwarden.eu`  | `https://api.bitwarden.eu`      | `https://identity.bitwarden.eu`      |
 
 For example, when restoring to Vaultwarden at
 `https://vaultwarden.example.com`, the script sends the login/token request to
