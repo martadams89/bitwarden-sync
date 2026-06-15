@@ -24,6 +24,23 @@ volumes:
 If you already mount `./config/backups`, add the `bitwarden-cli` mount alongside
 it and keep that directory between container restarts.
 
+The Docker script also stores its REST API device identifier in that directory.
+This prevents each scheduled API-key login from appearing as a new client and
+triggering another Bitwarden Cloud login email. The first run creates the file;
+later runs reuse it.
+
+You can supply a fixed identifier and display name instead:
+
+```yaml
+environment:
+  - BW_DEVICE_IDENTIFIER=bitwarden-sync-production
+  - BW_DEVICE_NAME=bitwarden-sync
+```
+
+Keep `BW_DEVICE_IDENTIFIER` stable after the first login. Changing it, deleting
+the persisted `device-identifier` file, or removing the app-data volume causes
+Bitwarden to see a new client again.
+
 ### Docker – Encrypted Passwords
 
 Storing passwords as plaintext environment variables is convenient but not ideal.
@@ -151,6 +168,26 @@ export BW_CLIENTSECRET_DEST=XXXX
 export BW_SERVER_DEST=https://vault.bitwarden.com
 ```
 
+Both sync scripts derive destination REST endpoints from `BW_SERVER_DEST`.
+Self-hosted Bitwarden and Vaultwarden servers use
+`$BW_SERVER_DEST/api` and `$BW_SERVER_DEST/identity`. Bitwarden Cloud
+automatically uses its separate `api.bitwarden.com` and
+`identity.bitwarden.com` services (and likewise for the `.eu` service).
+
+For deployments with non-standard endpoint URLs, set either or both optional
+overrides:
+
+```bash
+export BW_API_URL_DEST=https://vaultwarden.example.com/api
+export BW_IDENTITY_URL_DEST=https://vaultwarden.example.com/identity
+```
+
+The standalone script stores its REST device identity in
+`.bitwarden-sync/device-identifier`, beside the script. Keep that file to avoid
+repeated Bitwarden Cloud "new client" emails. You can override the state
+directory with `BITWARDEN_SYNC_STATE_DIR`, or set a fixed
+`BW_DEVICE_IDENTIFIER`.
+
 2. Make the script executable
 
 ```
@@ -183,7 +220,15 @@ The restore process uses the **Bitwarden REST API** to clear the destination vau
 4. Deletes existing folders individually via `DELETE /folders/{id}`
 5. Imports the full backup using `bw import bitwardenjson` in a single call
 
-This approach is compatible with **Bitwarden CLI 2026.x**, which introduced a master-password re-prompt requirement for all vault data operations. The import uses a PTY (`script`) to satisfy the single prompt automatically.
+REST requests use bounded timeouts and retries. Responses are validated before
+the destination is changed, and cipher deletion falls back to individual API
+requests when the destination does not support bulk deletion.
+
+This approach is compatible with **Bitwarden CLI 2026.x**, which introduced a
+master-password re-prompt requirement for all vault data operations. The import
+uses a PTY (`script`) to satisfy the single prompt automatically.
+On macOS and other systems without the util-linux version of `script`, the
+standalone script uses `expect` instead.
 
 ## Optional: Testing with a Subset
 

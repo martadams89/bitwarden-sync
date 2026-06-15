@@ -8,6 +8,10 @@ services:
       - CRON_SCHEDULE=0 0 * * *
       # Optional override for CLI app data location (default shown)
       - BITWARDENCLI_APPDATA_DIR=/app/data/bitwarden-cli
+      # The REST API device ID is persisted in the app data directory.
+      # Optional fixed overrides:
+      # - BW_DEVICE_IDENTIFIER=bitwarden-sync-production
+      # - BW_DEVICE_NAME=bitwarden-sync
 
       # ── Password options (choose ONE method per secret) ──────────────────────
       #
@@ -45,6 +49,10 @@ services:
       - BW_CLIENTID_DEST=user.1221212-121212-12121-12121
       - BW_CLIENTSECRET_DEST=Dsfdfdfdfdfdfdfdfdfgfdfdfds
       - BW_SERVER_DEST=https://vault.bitwarden.com
+      # Optional for non-standard deployments. Defaults are derived from
+      # BW_SERVER_DEST as <server>/api and <server>/identity.
+      # - BW_API_URL_DEST=https://vault.mydomain.com/api
+      # - BW_IDENTITY_URL_DEST=https://vault.mydomain.com/identity
       # Optional Healthcheck IO Integration
       - HEALTHCHECK_URL=https://healtcheck.url.com/ping
       - HEALTHCHECK_PING=1234343r3fadgsdgs

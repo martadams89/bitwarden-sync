@@ -1,8 +1,95 @@
 #!/bin/bash
 
+resolve_destination_urls() {
+  local server="${BW_SERVER_DEST%/}"
+
+  if [[ ! "$server" =~ ^https?://[^/]+(/.*)?$ ]]; then
+    echo "ERROR: BW_SERVER_DEST must be an absolute HTTP(S) URL" >&2
+    return 1
+  fi
+
+  if [ -n "$BW_API_URL_DEST" ]; then
+    DEST_API_URL="${BW_API_URL_DEST%/}"
+  elif [[ "$server" =~ ^(https?://)vault\.bitwarden\.(com|eu)$ ]]; then
+    DEST_API_URL="${BASH_REMATCH[1]}api.bitwarden.${BASH_REMATCH[2]}"
+  else
+    DEST_API_URL="$server/api"
+  fi
+
+  if [ -n "$BW_IDENTITY_URL_DEST" ]; then
+    DEST_IDENTITY_URL="${BW_IDENTITY_URL_DEST%/}"
+  elif [[ "$server" =~ ^(https?://)vault\.bitwarden\.(com|eu)$ ]]; then
+    DEST_IDENTITY_URL="${BASH_REMATCH[1]}identity.bitwarden.${BASH_REMATCH[2]}"
+  else
+    DEST_IDENTITY_URL="$server/identity"
+  fi
+
+  if [[ ! "$DEST_API_URL" =~ ^https?:// ]] || [[ ! "$DEST_IDENTITY_URL" =~ ^https?:// ]]; then
+    echo "ERROR: Destination API and identity URLs must be absolute HTTP(S) URLs" >&2
+    return 1
+  fi
+}
+
+curl_api() {
+  curl --silent --show-error \
+    --connect-timeout "${BW_API_CONNECT_TIMEOUT:-10}" \
+    --max-time "${BW_API_MAX_TIME:-60}" \
+    --retry "${BW_API_RETRIES:-3}" \
+    --retry-delay 2 \
+    "$@"
+}
+
+delete_api_resource() {
+  local url="$1"
+  shift
+  local status
+
+  if ! status=$(curl_api -X DELETE "$url" "$@" -w "%{http_code}" -o /dev/null); then
+    return 1
+  fi
+
+  [[ "$status" =~ ^2[0-9][0-9]$ ]] || return 1
+  printf '%s' "$status"
+}
+
+resolve_device_identifier() {
+  local identifier_file="${BW_DEVICE_IDENTIFIER_FILE:-$BITWARDENCLI_APPDATA_DIR/device-identifier}"
+  local identifier
+
+  if [ -n "$BW_DEVICE_IDENTIFIER" ]; then
+    DEST_DEVICE_IDENTIFIER="$BW_DEVICE_IDENTIFIER"
+    return
+  fi
+
+  if [ -s "$identifier_file" ]; then
+    IFS= read -r DEST_DEVICE_IDENTIFIER < "$identifier_file"
+  else
+    identifier=$(uuidgen)
+    if [ -z "$identifier" ]; then
+      echo "ERROR: Failed to generate a Bitwarden device identifier" >&2
+      return 1
+    fi
+
+    umask 077
+    if ! printf '%s\n' "$identifier" > "$identifier_file"; then
+      echo "ERROR: Failed to persist Bitwarden device identifier: $identifier_file" >&2
+      return 1
+    fi
+    DEST_DEVICE_IDENTIFIER="$identifier"
+  fi
+
+  if [ -z "$DEST_DEVICE_IDENTIFIER" ]; then
+    echo "ERROR: Persisted Bitwarden device identifier is empty: $identifier_file" >&2
+    return 1
+  fi
+}
+
 # Persist Bitwarden CLI state to keep a stable device identity between runs.
 export BITWARDENCLI_APPDATA_DIR="${BITWARDENCLI_APPDATA_DIR:-/app/data/bitwarden-cli}"
 mkdir -p "$BITWARDENCLI_APPDATA_DIR"
+if ! resolve_device_identifier; then
+  exit 1
+fi
 
 # Helper: resolve a password/secret from (in priority order):
 #   1. An OpenSSL-encrypted file + keyfile  ({VAR}_ENC_FILE and {VAR}_KEYFILE)
@@ -142,6 +229,12 @@ unset BW_CLIENTSECRET
 export BW_CLIENTID=${BW_CLIENTID_DEST}
 export BW_CLIENTSECRET=${BW_CLIENTSECRET_DEST}
 
+if ! resolve_destination_urls; then
+  exit 1
+fi
+echo "# Destination API: $DEST_API_URL #"
+echo "# Destination identity: $DEST_IDENTITY_URL #"
+
 # Logging out before work
 echo "# Logging out from Bitwarden... #"
 bw-new logout 2>/dev/null || true
@@ -180,29 +273,47 @@ fi
 # Clear the destination vault via Bitwarden REST API (no PTY/CLI needed for deletion).
 # Bulk-deleting via API is orders of magnitude faster than per-item bw-new calls.
 echo "# Getting API access token... #"
-API_TOKEN=$(curl -sf -X POST "https://identity.bitwarden.com/connect/token" \
+BW_CLIENT_VERSION=$(bw-new --version 2>/dev/null || printf '%s' "unknown")
+if ! TOKEN_RESPONSE=$(curl_api --fail -X POST "$DEST_IDENTITY_URL/connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -H "Bitwarden-Client-Version: 2026.4.1" \
+  -H "Bitwarden-Client-Version: $BW_CLIENT_VERSION" \
   -H "Bitwarden-Client-Name: cli" \
   --data-urlencode "grant_type=client_credentials" \
   --data-urlencode "scope=api" \
   --data-urlencode "client_id=${BW_CLIENTID_DEST}" \
   --data-urlencode "client_secret=${BW_CLIENTSECRET_DEST}" \
   --data-urlencode "deviceType=8" \
-  --data-urlencode "deviceIdentifier=$(uuidgen)" \
-  --data-urlencode "deviceName=bitwarden-sync" \
-  | jq -r '.access_token // empty')
+  --data-urlencode "deviceIdentifier=$DEST_DEVICE_IDENTIFIER" \
+  --data-urlencode "deviceName=${BW_DEVICE_NAME:-bitwarden-sync}"); then
+  echo "# ERROR: Failed to contact destination identity server: $DEST_IDENTITY_URL #" >&2
+  rm -f "$DEST_LATEST_BACKUP_JSON"
+  exit 1
+fi
+API_TOKEN=$(printf '%s' "$TOKEN_RESPONSE" | jq -r '.access_token // empty' 2>/dev/null)
 
 if [ -z "$API_TOKEN" ]; then
-  echo "# ERROR: Failed to get Bitwarden API access token #"
+  echo "# ERROR: Destination identity server returned no API access token #" >&2
   rm -f "$DEST_LATEST_BACKUP_JSON"
   exit 1
 fi
 echo "# API token obtained #"
 
 echo "# Fetching existing vault contents... #"
-SYNC_DATA=$(curl -sf "https://api.bitwarden.com/sync?excludeDomains=true" \
-  -H "Authorization: Bearer $API_TOKEN")
+if ! SYNC_DATA=$(curl_api --fail "$DEST_API_URL/sync?excludeDomains=true" \
+  -H "Authorization: Bearer $API_TOKEN"); then
+  echo "# ERROR: Failed to fetch destination vault from $DEST_API_URL #" >&2
+  rm -f "$DEST_LATEST_BACKUP_JSON"
+  exit 1
+fi
+if ! printf '%s' "$SYNC_DATA" | jq -e '
+  type == "object" and
+  (.ciphers | type == "array") and
+  (.folders | type == "array")
+' >/dev/null 2>&1; then
+  echo "# ERROR: Destination sync endpoint returned an invalid vault response #" >&2
+  rm -f "$DEST_LATEST_BACKUP_JSON"
+  exit 1
+fi
 
 # Extract IDs — sync response uses lowercase keys; skip org ciphers (organizationId != null)
 CIPHER_IDS=$(printf '%s' "$SYNC_DATA" | \
@@ -223,23 +334,39 @@ if [ "$CIPHER_COUNT" -gt 0 ]; then
     BATCH=$(printf '%s' "$CIPHER_IDS" | jq ".[${OFFSET}:$((OFFSET+500))]")
     BATCH_SIZE=$(printf '%s' "$BATCH" | jq 'length')
     [ "$BATCH_SIZE" -eq 0 ] && break
-    STATUS=$(curl -sf -X DELETE "https://api.bitwarden.com/ciphers" \
+    if STATUS=$(delete_api_resource "$DEST_API_URL/ciphers" \
       -H "Authorization: Bearer $API_TOKEN" \
       -H "Content-Type: application/json" \
-      -d "{\"ids\": $BATCH}" \
-      -w "%{http_code}" -o /dev/null 2>/dev/null)
-    TOTAL_DELETED=$((TOTAL_DELETED + BATCH_SIZE))
-    echo "# Deleted batch $TOTAL_DELETED/$CIPHER_COUNT (HTTP $STATUS) #"
+      -d "{\"ids\": $BATCH}"); then
+      TOTAL_DELETED=$((TOTAL_DELETED + BATCH_SIZE))
+      echo "# Deleted batch $TOTAL_DELETED/$CIPHER_COUNT (HTTP $STATUS) #"
+    else
+      echo "# Bulk deletion unavailable; deleting this batch individually... #"
+      mapfile -t BATCH_IDS < <(printf '%s' "$BATCH" | jq -r '.[]')
+      for id in "${BATCH_IDS[@]}"; do
+        if ! STATUS=$(delete_api_resource "$DEST_API_URL/ciphers/$id" \
+          -H "Authorization: Bearer $API_TOKEN"); then
+          echo "# ERROR: Failed to delete cipher $id #" >&2
+          rm -f "$DEST_LATEST_BACKUP_JSON"
+          exit 1
+        fi
+        TOTAL_DELETED=$((TOTAL_DELETED + 1))
+      done
+      echo "# Deleted individually $TOTAL_DELETED/$CIPHER_COUNT #"
+    fi
     OFFSET=$((OFFSET + 500))
   done
 fi
 
 # Delete folders individually (no bulk endpoint)
-printf '%s' "$FOLDER_IDS" | jq -r '.[]' 2>/dev/null | while read -r id; do
-  [ -z "$id" ] && continue
-  STATUS=$(curl -sf -X DELETE "https://api.bitwarden.com/folders/$id" \
-    -H "Authorization: Bearer $API_TOKEN" \
-    -w "%{http_code}" -o /dev/null 2>/dev/null)
+mapfile -t DEST_FOLDER_IDS < <(printf '%s' "$FOLDER_IDS" | jq -r '.[]' 2>/dev/null)
+for id in "${DEST_FOLDER_IDS[@]}"; do
+  if ! STATUS=$(delete_api_resource "$DEST_API_URL/folders/$id" \
+    -H "Authorization: Bearer $API_TOKEN"); then
+    echo "# ERROR: Failed to delete folder $id #" >&2
+    rm -f "$DEST_LATEST_BACKUP_JSON"
+    exit 1
+  fi
   echo "# Deleted folder $id (HTTP $STATUS) #"
 done
 
