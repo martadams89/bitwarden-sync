@@ -39,6 +39,35 @@ curl_api() {
     "$@"
 }
 
+# Log into the source server and unlock its vault, retrying the whole
+# config -> login -> unlock sequence to ride out transient identity-endpoint
+# failures (e.g. undici "Premature close"). The real CLI error is captured and
+# surfaced instead of being swallowed. On success, sets BW_SESSION_SOURCE.
+# Tunable via BW_LOGIN_RETRIES (default 3) and BW_LOGIN_RETRY_DELAY (default 5s).
+source_login_unlock() {
+  local tries="${BW_LOGIN_RETRIES:-3}" delay="${BW_LOGIN_RETRY_DELAY:-5}"
+  local attempt=1 err session
+  while :; do
+    bw-old logout >/dev/null 2>&1 || true
+    bw-old config server "$BW_SERVER_SOURCE" >/dev/null 2>&1
+    if err=$(bw-old login --apikey 2>&1); then
+      if session=$(bw-old unlock "$BW_PASS_SOURCE" --raw 2>/dev/null) && [ -n "$session" ]; then
+        BW_SESSION_SOURCE="$session"
+        return 0
+      fi
+      err="login succeeded but unlock returned an empty session"
+    fi
+    if [ "$attempt" -ge "$tries" ]; then
+      echo "# ERROR: Source login/unlock failed after $tries attempts: $err #" >&2
+      return 1
+    fi
+    echo "# Source login attempt $attempt/$tries failed: $err; retrying in ${delay}s... #" >&2
+    attempt=$((attempt + 1))
+    sleep "$delay"
+    delay=$((delay * 2))
+  done
+}
+
 delete_api_resource() {
   local url="$1"
   shift
@@ -183,23 +212,15 @@ source_export_files=$(find /app/backups -type f -name "bw_export_*.tar.gz.enc")
 find $source_export_files -type f -mtime +30 -exec rm -f {} +
 rm -f -R $SOURCE_EXPORT_OUTPUT_BASE*.json
 
-# Lets make sure we're logged out before we get to work
-echo "# Logging out from Bitwarden... #"
-bw-old logout 2>/dev/null || true
-
-# Login to our Server (using old CLI for Vaultwarden compatibility)
-echo "# Logging into Source Bitwarden Server (using CLI 2024.9.0)... #"
-bw-old logout 2>/dev/null || true
-bw-old config server $BW_SERVER_SOURCE
-bw-old login --apikey
-
+# Login to our Server (using old CLI for Vaultwarden compatibility) and unlock.
+# source_login_unlock handles logout/config/login/unlock with retry + backoff.
+echo "# Logging into Source Bitwarden Server (using CLI $(bw-old --version 2>/dev/null || echo unknown))... #"
 echo "# Unlocking the vault... #"
-BW_SESSION_SOURCE=$(bw-old unlock "$BW_PASS_SOURCE" --raw)
-
-if [ -z "$BW_SESSION_SOURCE" ]; then
+if ! source_login_unlock; then
   echo "# ERROR: Failed to unlock source vault #"
   exit 1
 fi
+echo "# Vault unlocked #"
 
 # Export out all items
 echo "# Exporting all items... #"

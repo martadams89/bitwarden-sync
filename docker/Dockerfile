@@ -10,14 +10,27 @@ RUN apk --no-cache add python3 curl bash ca-certificates openssl ncurses coreuti
 # Suppress Node.js deprecation warnings
 ENV NODE_OPTIONS="--no-deprecation"
 
-# Install both versions of Bitwarden CLI in separate locations
+# Bitwarden CLI versions. Override at build time with --build-arg, or at runtime
+# by setting the matching env var (the entrypoint reconciles a concrete version
+# that differs from the baked-in one). Keep comments on their own lines: Docker
+# does NOT strip an inline "# ..." after an ARG value.
+# Source / Vaultwarden compatibility (issue #50):
+ARG BW_CLI_OLD_VERSION=2025.12.0
+# Destination / Bitwarden cloud:
+ARG BW_CLI_NEW_VERSION=latest
+# Bridge the build args to env vars so they can be overridden at runtime too.
+ENV BW_CLI_OLD_VERSION=${BW_CLI_OLD_VERSION} \
+    BW_CLI_NEW_VERSION=${BW_CLI_NEW_VERSION}
+
+# Install both versions of Bitwarden CLI in separate locations.
+# Install the pinned "old" CLI into an isolated path for the source, then the
+# "new" CLI globally for the destination.
 RUN npm install -g semver && \
-    # npm install -g @bitwarden/cli@2024.9.0 && \
-    npm install -g @bitwarden/cli && \
+    npm install -g @bitwarden/cli@${BW_CLI_OLD_VERSION} && \
     mkdir -p /opt/bw-old && \
     cp -r /usr/local/lib/node_modules/@bitwarden/cli /opt/bw-old/ && \
     cp -r /usr/local/lib/node_modules /opt/bw-old/node_modules && \
-    npm install -g @bitwarden/cli
+    npm install -g @bitwarden/cli@${BW_CLI_NEW_VERSION}
 
 # Create wrapper scripts for both versions
 RUN echo '#!/bin/sh' > /usr/local/bin/bw-old && \
@@ -25,30 +38,21 @@ RUN echo '#!/bin/sh' > /usr/local/bin/bw-old && \
     chmod +x /usr/local/bin/bw-old && \
     ln -s $(which bw) /usr/local/bin/bw-new
 
-# Define cron schedule and script variables
-CMD echo ${BW_TAR_PASS}
-CMD echo ${BW_ACCOUNT_SOURCE}
-CMD echo ${BW_PASS_SOURCE}
-CMD echo ${BW_CLIENTID_SOURCE}
-CMD echo ${BW_CLIENTSECRET_SOURCE}
-CMD echo ${BW_SERVER_SOURCE}
-CMD echo ${BW_ACCOUNT_DEST}
-CMD echo ${BW_PASS_DEST}
-CMD echo ${BW_CLIENTID_DEST}
-CMD echo ${BW_CLIENTSECRET_SOURCE}
-CMD echo ${BW_SERVER_DEST}
-
 # Define a default cron schedule
 ENV CRON_SCHEDULE="57 23 * * *"
 
 # Create a cron job file with the defined schedule
 RUN echo "$CRON_SCHEDULE root /app/script.sh > /var/log/cron.log 2>&1" > /etc/crontabs/root
 
-# Copy your script and encryption files to the container
+# Copy your script, entrypoint, and encryption files to the container
 COPY docker/bitwarden_sync.sh /app/script.sh
+COPY docker/entrypoint.sh /app/entrypoint.sh
 
-# Make your script executable
-RUN chmod +x /app/script.sh
+# Make your scripts executable
+RUN chmod +x /app/script.sh /app/entrypoint.sh
+
+# The entrypoint reconciles CLI versions (if overridden) then execs the CMD.
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Start cron and log output to console
 CMD ["sh", "-c", "echo \"$CRON_SCHEDULE /app/script.sh > /proc/1/fd/1 2>&1\" > /etc/crontabs/root && crond -f -L /dev/stdout"]

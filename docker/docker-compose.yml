@@ -3,9 +3,27 @@ services:
   bitwarden-sync:
     image: martadams89/bitwarden-sync:latest
     container_name: bitwarden-sync
+    # To bake custom Bitwarden CLI versions into a locally built image, comment
+    # out `image:` above and uncomment this block:
+    # build:
+    #   context: ..
+    #   dockerfile: docker/Dockerfile
+    #   args:
+    #     BW_CLI_OLD_VERSION: 2025.12.0   # source / Vaultwarden compatibility
+    #     BW_CLI_NEW_VERSION: latest      # destination / Bitwarden cloud
     restart: always
     environment:
       - CRON_SCHEDULE=0 0 * * *
+      # Optional: override the Bitwarden CLI version at RUNTIME (works on the
+      # published image, no rebuild needed). The entrypoint reinstalls only when
+      # a concrete version differs from the baked-in default (source 2025.12.0,
+      # destination latest). Pin a known-good source version here if a future
+      # CLI release breaks Vaultwarden again (issue #50):
+      # - BW_CLI_OLD_VERSION=2025.12.0
+      # - BW_CLI_NEW_VERSION=latest
+      # Optional: source login retry tuning (defaults shown)
+      # - BW_LOGIN_RETRIES=3
+      # - BW_LOGIN_RETRY_DELAY=5
       # Optional override for CLI app data location (default shown)
       - BITWARDENCLI_APPDATA_DIR=/app/data/bitwarden-cli
       # The REST API device ID is persisted in the app data directory.

@@ -248,6 +248,62 @@ uses a PTY (`script`) to satisfy the single prompt automatically.
 On macOS and other systems without the util-linux version of `script`, the
 standalone script uses `expect` instead.
 
+## Bitwarden CLI Versions (Docker)
+
+The Docker image installs **two** Bitwarden CLI versions side by side:
+
+| Wrapper  | Used for                         | Default version | Build arg             |
+| -------- | -------------------------------- | --------------- | --------------------- |
+| `bw-old` | Source (Vaultwarden) login/export | `2025.12.0`     | `BW_CLI_OLD_VERSION`  |
+| `bw-new` | Destination (Bitwarden cloud)    | `latest`        | `BW_CLI_NEW_VERSION`  |
+
+The source uses a pinned, known-good version because newer CLIs have repeatedly
+broken against self-hosted Vaultwarden — most recently with
+`FetchError: ... /identity/connect/token: Premature close` (see issue #50).
+`2025.12.0` is the current confirmed-working version for Vaultwarden. Pinning
+also makes builds reproducible.
+
+You can change either version two ways:
+
+**At runtime (recommended — works on the published image, no rebuild).** Set the
+matching env var in `docker-compose.yml`. The entrypoint reinstalls a CLI only
+when a *concrete* version differs from the baked-in default, so default startups
+do no extra work:
+
+```yaml
+environment:
+  - BW_CLI_OLD_VERSION=2025.12.0   # source / Vaultwarden
+  - BW_CLI_NEW_VERSION=latest      # destination / Bitwarden cloud
+```
+
+A value of `latest` (or unset) keeps the baked-in build. Pinning a concrete
+version triggers a one-time reinstall at container start (needs network access).
+
+**At build time** (bakes the version into a locally built image):
+
+```bash
+docker build -f docker/Dockerfile \
+  --build-arg BW_CLI_OLD_VERSION=2025.12.0 \
+  --build-arg BW_CLI_NEW_VERSION=latest \
+  -t bitwarden-sync .
+```
+
+or via a `build.args` block in `docker-compose.yml` (see the commented example
+there). If a future CLI release breaks Vaultwarden again, set
+`BW_CLI_OLD_VERSION` to the last version that worked for you.
+
+### Source login resilience
+
+The source login (`config` → `login` → `unlock`) is retried with exponential
+backoff to ride out transient identity-endpoint failures, and the actual CLI
+error is now logged instead of being swallowed. Tune with:
+
+```yaml
+environment:
+  - BW_LOGIN_RETRIES=3       # number of attempts (default 3)
+  - BW_LOGIN_RETRY_DELAY=5   # initial delay in seconds, doubles each retry (default 5)
+```
+
 ## Optional: Testing with a Subset
 
 Set `BW_IMPORT_LIMIT=N` to import only N items per type (login, secure note, card, identity) instead of the full vault. Useful for validating your setup before running a full sync:
