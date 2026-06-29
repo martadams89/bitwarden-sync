@@ -190,7 +190,7 @@ volumes:
 
 ### Persisting CLI state
 
-Bitwarden Cloud sends a *"new client logged in"* email whenever it sees a fresh
+Bitwarden Cloud sends a _"new client logged in"_ email whenever it sees a fresh
 device. Persist the CLI app-data directory (which also stores the REST device
 identifier) so the same device identity is reused across runs:
 
@@ -219,10 +219,10 @@ environment:
 The image installs **two** Bitwarden CLI versions side by side, because the
 source and destination have different compatibility needs:
 
-| Wrapper  | Used for                          | Default    | Build arg            |
-| -------- | --------------------------------- | ---------- | -------------------- |
-| `bw-old` | Source (Vaultwarden) login/export | `2025.12.0`| `BW_CLI_OLD_VERSION` |
-| `bw-new` | Destination (Bitwarden cloud)     | `latest`   | `BW_CLI_NEW_VERSION` |
+| Wrapper  | Used for                          | Default     | Build arg            |
+| -------- | --------------------------------- | ----------- | -------------------- |
+| `bw-old` | Source (Vaultwarden) login/export | `2025.12.0` | `BW_CLI_OLD_VERSION` |
+| `bw-new` | Destination (Bitwarden cloud)     | `latest`    | `BW_CLI_NEW_VERSION` |
 
 The source is pinned to a known-good version because newer CLIs have repeatedly
 broken against self-hosted Vaultwarden — most recently with
@@ -231,13 +231,13 @@ broken against self-hosted Vaultwarden — most recently with
 reproducible.
 
 **Override at runtime** (recommended — works on the published image, no rebuild).
-The entrypoint reinstalls a CLI only when a *concrete* version differs from the
+The entrypoint reinstalls a CLI only when a _concrete_ version differs from the
 baked-in default, so default startups do no extra work:
 
 ```yaml
 environment:
-  - BW_CLI_OLD_VERSION=2025.12.0   # source / Vaultwarden
-  - BW_CLI_NEW_VERSION=latest      # destination / Bitwarden cloud
+  - BW_CLI_OLD_VERSION=2025.12.0 # source / Vaultwarden
+  - BW_CLI_NEW_VERSION=latest # destination / Bitwarden cloud
 ```
 
 `latest` (or unset) keeps the baked-in build; pinning a concrete version triggers
@@ -259,20 +259,20 @@ backoff, and the actual CLI error is logged instead of being swallowed:
 
 ```yaml
 environment:
-  - BW_LOGIN_RETRIES=3       # attempts per CLI version (default 3)
-  - BW_LOGIN_RETRY_DELAY=5   # initial delay (s), doubles each retry (default 5)
+  - BW_LOGIN_RETRIES=3 # attempts per CLI version (default 3)
+  - BW_LOGIN_RETRY_DELAY=5 # initial delay (s), doubles each retry (default 5)
 ```
 
 **Automatic CLI version fallback.** No server advertises which CLI version it
 supports — `Premature close` is a transport-level bug in a given CLI build's
 bundled Node, so compatibility is empirical. If the source login keeps failing
-with a *transport* error, the container reinstalls the next known-good version
+with a _transport_ error, the container reinstalls the next known-good version
 and retries. The installed version is tried first, then each entry in
 `BW_CLI_OLD_FALLBACK_VERSIONS`:
 
 ```yaml
 environment:
-  - BW_CLI_OLD_FALLBACK_VERSIONS=2025.12.0 2024.9.0   # default; space/comma separated
+  - BW_CLI_OLD_FALLBACK_VERSIONS=2025.12.0 2024.9.0 # default; space/comma separated
 ```
 
 A wrong master password or an auth/API-key error stops immediately — cycling
@@ -407,25 +407,25 @@ environment:
 
 ## Configuration Reference
 
-| Variable | Scope | Default | Description |
-| -------- | ----- | ------- | ----------- |
-| `BW_SERVER_SOURCE` / `BW_SERVER_DEST` | both | — | Source / destination base URLs |
-| `BW_CLIENTID_SOURCE` / `BW_CLIENTSECRET_SOURCE` | both | — | Source API key |
-| `BW_CLIENTID_DEST` / `BW_CLIENTSECRET_DEST` | both | — | Destination API key |
-| `BW_PASS_SOURCE` / `BW_PASS_DEST` | both | — | Master passwords (also `_FILE`, `_ENC_FILE`/`_KEYFILE`) |
-| `BW_TAR_PASS` | both | — | Encryption password for backup archives (also `_FILE`, `_ENC_FILE`/`_KEYFILE`) |
-| `BW_API_URL_DEST` / `BW_IDENTITY_URL_DEST` | both | derived | Override destination endpoints (non-standard proxies only) |
-| `CRON_SCHEDULE` | Docker | `57 23 * * *` | Cron expression for the scheduled run |
-| `BITWARDENCLI_APPDATA_DIR` | Docker | `/app/data/bitwarden-cli` | CLI state directory (persist via volume) |
-| `BITWARDEN_SYNC_STATE_DIR` | standalone | `./.bitwarden-sync` | State directory beside the script |
-| `BW_BACKUP_DIR` | standalone | `./backups` | Where encrypted archives are written |
-| `BW_DEVICE_IDENTIFIER` / `BW_DEVICE_NAME` | both | generated | Fixed REST device identity |
-| `BW_CLI_OLD_VERSION` / `BW_CLI_NEW_VERSION` | Docker | `2025.12.0` / `latest` | Source / destination CLI version (build arg + runtime) |
-| `BW_CLI_OLD_FALLBACK_VERSIONS` | Docker | `2025.12.0 2024.9.0` | Source CLI versions tried on transport failure |
-| `BW_LOGIN_RETRIES` / `BW_LOGIN_RETRY_DELAY` | both | `3` / `5` | Source login retry count / initial backoff (s) |
-| `BW_API_CONNECT_TIMEOUT` / `BW_API_MAX_TIME` / `BW_API_RETRIES` | both | `10` / `60` / `3` | REST `curl` connect timeout / max time / retries |
-| `BW_IMPORT_LIMIT` | both | unset | Import only N items per type (testing) |
-| `HEALTHCHECK_URL` / `HEALTHCHECK_PING` | both | unset | [Healthchecks.io](https://healthchecks.io) start/success pings |
+| Variable                                                        | Scope      | Default                   | Description                                                                    |
+| --------------------------------------------------------------- | ---------- | ------------------------- | ------------------------------------------------------------------------------ |
+| `BW_SERVER_SOURCE` / `BW_SERVER_DEST`                           | both       | —                         | Source / destination base URLs                                                 |
+| `BW_CLIENTID_SOURCE` / `BW_CLIENTSECRET_SOURCE`                 | both       | —                         | Source API key                                                                 |
+| `BW_CLIENTID_DEST` / `BW_CLIENTSECRET_DEST`                     | both       | —                         | Destination API key                                                            |
+| `BW_PASS_SOURCE` / `BW_PASS_DEST`                               | both       | —                         | Master passwords (also `_FILE`, `_ENC_FILE`/`_KEYFILE`)                        |
+| `BW_TAR_PASS`                                                   | both       | —                         | Encryption password for backup archives (also `_FILE`, `_ENC_FILE`/`_KEYFILE`) |
+| `BW_API_URL_DEST` / `BW_IDENTITY_URL_DEST`                      | both       | derived                   | Override destination endpoints (non-standard proxies only)                     |
+| `CRON_SCHEDULE`                                                 | Docker     | `57 23 * * *`             | Cron expression for the scheduled run                                          |
+| `BITWARDENCLI_APPDATA_DIR`                                      | Docker     | `/app/data/bitwarden-cli` | CLI state directory (persist via volume)                                       |
+| `BITWARDEN_SYNC_STATE_DIR`                                      | standalone | `./.bitwarden-sync`       | State directory beside the script                                              |
+| `BW_BACKUP_DIR`                                                 | standalone | `./backups`               | Where encrypted archives are written                                           |
+| `BW_DEVICE_IDENTIFIER` / `BW_DEVICE_NAME`                       | both       | generated                 | Fixed REST device identity                                                     |
+| `BW_CLI_OLD_VERSION` / `BW_CLI_NEW_VERSION`                     | Docker     | `2025.12.0` / `latest`    | Source / destination CLI version (build arg + runtime)                         |
+| `BW_CLI_OLD_FALLBACK_VERSIONS`                                  | Docker     | `2025.12.0 2024.9.0`      | Source CLI versions tried on transport failure                                 |
+| `BW_LOGIN_RETRIES` / `BW_LOGIN_RETRY_DELAY`                     | both       | `3` / `5`                 | Source login retry count / initial backoff (s)                                 |
+| `BW_API_CONNECT_TIMEOUT` / `BW_API_MAX_TIME` / `BW_API_RETRIES` | both       | `10` / `60` / `3`         | REST `curl` connect timeout / max time / retries                               |
+| `BW_IMPORT_LIMIT`                                               | both       | unset                     | Import only N items per type (testing)                                         |
+| `HEALTHCHECK_URL` / `HEALTHCHECK_PING`                          | both       | unset                     | [Healthchecks.io](https://healthchecks.io) start/success pings                 |
 
 ## Testing with a Subset
 
