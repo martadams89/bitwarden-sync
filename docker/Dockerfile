@@ -44,9 +44,10 @@ ENV CRON_SCHEDULE="57 23 * * *"
 # Create a cron job file with the defined schedule
 RUN echo "$CRON_SCHEDULE root /app/script.sh > /var/log/cron.log 2>&1" > /etc/crontabs/root
 
-# Copy your script, entrypoint, and encryption files to the container
+# Copy your script, entrypoint, shared CLI helpers, and encryption files
 COPY docker/bitwarden_sync.sh /app/script.sh
 COPY docker/entrypoint.sh /app/entrypoint.sh
+COPY docker/bw-cli-lib.sh /app/bw-cli-lib.sh
 
 # Make your scripts executable
 RUN chmod +x /app/script.sh /app/entrypoint.sh

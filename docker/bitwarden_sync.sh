@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Shared CLI install helpers (provides reinstall_bw_old for auto-fallback).
+# Present only inside the Docker image; guarded so the script still parses
+# elsewhere.
+if [ -f /app/bw-cli-lib.sh ]; then
+  . /app/bw-cli-lib.sh
+fi
+
 resolve_destination_urls() {
   local server="${BW_SERVER_DEST%/}"
 
@@ -39,12 +46,17 @@ curl_api() {
     "$@"
 }
 
-# Log into the source server and unlock its vault, retrying the whole
-# config -> login -> unlock sequence to ride out transient identity-endpoint
-# failures (e.g. undici "Premature close"). The real CLI error is captured and
-# surfaced instead of being swallowed. On success, sets BW_SESSION_SOURCE.
+# Attempt config -> login -> unlock against the source with the currently
+# installed bw-old, retrying transient transport failures (e.g. undici
+# "Premature close") with backoff. The real CLI error is captured and surfaced
+# instead of being swallowed. On success, sets BW_SESSION_SOURCE.
 # Tunable via BW_LOGIN_RETRIES (default 3) and BW_LOGIN_RETRY_DELAY (default 5s).
-source_login_unlock() {
+# Return codes:
+#   0 success
+#   1 login failed with a transport-class error (worth trying another CLI version)
+#   2 logged in but unlock failed (wrong master password — version change won't help)
+#   3 login failed with a non-transport error (auth/config — version change won't help)
+try_source_login_unlock() {
   local tries="${BW_LOGIN_RETRIES:-3}" delay="${BW_LOGIN_RETRY_DELAY:-5}"
   local attempt=1 err session
   while :; do
@@ -55,17 +67,66 @@ source_login_unlock() {
         BW_SESSION_SOURCE="$session"
         return 0
       fi
-      err="login succeeded but unlock returned an empty session"
+      echo "# ERROR: Logged in but failed to unlock the source vault (check BW_PASS_SOURCE) #" >&2
+      return 2
+    fi
+    # Login failed — only transport-class errors are worth retrying/falling back.
+    if ! printf '%s' "$err" | grep -qiE 'premature close|fetch failed|fetcherror|invalid response body|econnreset|etimedout|esockettimedout|socket hang up|enotfound|eai_again|und_err|network|terminated'; then
+      echo "# ERROR: Source login failed (not a transport error): $err #" >&2
+      return 3
     fi
     if [ "$attempt" -ge "$tries" ]; then
-      echo "# ERROR: Source login/unlock failed after $tries attempts: $err #" >&2
+      echo "# Source login failed after $tries attempts on CLI $(bw-old --version 2>/dev/null): $err #" >&2
       return 1
     fi
-    echo "# Source login attempt $attempt/$tries failed: $err; retrying in ${delay}s... #" >&2
+    echo "# Source login attempt $attempt/$tries failed (transport): $err; retrying in ${delay}s... #" >&2
     attempt=$((attempt + 1))
     sleep "$delay"
     delay=$((delay * 2))
   done
+}
+
+# Log into the source vault, auto-falling back across known-good CLI versions
+# on transport failures. The installed version is tried first, then each version
+# in BW_CLI_OLD_FALLBACK_VERSIONS (space/comma separated; default below). On a
+# password/auth error we stop immediately — cycling versions cannot help.
+# Auto-fallback is Docker-only (requires the npm-managed CLI + reinstall_bw_old).
+source_login_unlock() {
+  local fallbacks="${BW_CLI_OLD_FALLBACK_VERSIONS:-2025.12.0 2024.9.0}"
+  local installed candidates="" v rc first=1
+  installed="$(bw-old --version 2>/dev/null || echo unknown)"
+
+  # Candidate list: installed version first, then configured fallbacks (deduped).
+  candidates="$installed"
+  for v in ${fallbacks//,/ }; do
+    case " $candidates " in *" $v "*) ;; *) candidates="$candidates $v" ;; esac
+  done
+
+  for v in $candidates; do
+    if [ "$first" = 0 ]; then
+      if ! command -v reinstall_bw_old >/dev/null 2>&1; then
+        break  # no reinstall capability (e.g. outside Docker) — can't fall back
+      fi
+      echo "# Source login failing on CLI $installed; switching to CLI $v and retrying... #" >&2
+      if ! reinstall_bw_old "$v"; then
+        echo "# WARNING: Failed to install Bitwarden CLI $v; trying next candidate #" >&2
+        continue
+      fi
+      installed="$(bw-old --version 2>/dev/null || echo "$v")"
+    fi
+    first=0
+
+    try_source_login_unlock
+    rc=$?
+    case "$rc" in
+      0) return 0 ;;
+      2 | 3) return 1 ;;        # password/auth/config — version change won't help
+      *) ;;                     # transport failure — try the next CLI version
+    esac
+  done
+
+  echo "# ERROR: Source login failed on all CLI versions tried: $candidates #" >&2
+  return 1
 }
 
 delete_api_resource() {
