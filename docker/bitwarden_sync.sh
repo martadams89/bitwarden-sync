@@ -46,6 +46,58 @@ curl_api() {
     "$@"
 }
 
+# Runs on exit (EXIT trap, installed once the run lock is held). Records the
+# outcome to $BW_STATUS_FILE, prints a one-line run summary, and sends the
+# healthcheck success/failure ping. Best-effort: never changes the exit code.
+finish() {
+  local rc=$?
+  # Only act for the main shell — never for a command-substitution subshell that
+  # happens to exit (e.g. resolve_secret runs inside $(...)).
+  [ "${BASHPID:-$$}" = "${MAIN_PID:-$$}" ] || return 0
+  local end_epoch duration finished
+  end_epoch=$(date +%s 2>/dev/null || echo "${START_EPOCH:-0}")
+  duration=$(( end_epoch - ${START_EPOCH:-end_epoch} ))
+  [ "$duration" -lt 0 ] && duration=0
+  finished=$(date 2>/dev/null || echo unknown)
+
+  echo "### Run summary: status=$SYNC_STATUS stage=$SYNC_STAGE duration=${duration}s exit=$rc backup_items=$BACKUP_ITEMS backup_folders=$BACKUP_FOLDERS cli_source=$CLI_SOURCE_VERSION cli_dest=$CLI_DEST_VERSION ###"
+
+  # Persist last-run status (best-effort; lives in the app-data volume).
+  if [ -n "$BW_STATUS_FILE" ] && command -v jq >/dev/null 2>&1; then
+    if jq -n \
+        --arg status "$SYNC_STATUS" \
+        --arg stage "$SYNC_STAGE" \
+        --arg started "${START_TIME:-}" \
+        --arg finished "$finished" \
+        --argjson duration "$duration" \
+        --argjson exit_code "$rc" \
+        --argjson items "${BACKUP_ITEMS:-0}" \
+        --argjson folders "${BACKUP_FOLDERS:-0}" \
+        --arg cli_source "$CLI_SOURCE_VERSION" \
+        --arg cli_dest "$CLI_DEST_VERSION" \
+        '{status:$status, stage:$stage, started:$started, finished:$finished,
+          duration_seconds:$duration, exit_code:$exit_code,
+          backup:{items:$items, folders:$folders},
+          cli:{source:$cli_source, destination:$cli_dest}}' \
+        > "${BW_STATUS_FILE}.tmp" 2>/dev/null; then
+      mv "${BW_STATUS_FILE}.tmp" "$BW_STATUS_FILE" 2>/dev/null || true
+    fi
+  fi
+
+  # Healthcheck ping (success, or /fail with the failing stage).
+  if [ -n "$HEALTHCHECK_URL" ] && [ -n "$HEALTHCHECK_PING" ]; then
+    if [ "$SYNC_STATUS" = "success" ]; then
+      echo "### Health Check - Success ###"
+      curl -fsS -m 10 --retry 5 "$HEALTHCHECK_URL/$HEALTHCHECK_PING?rid=$RID" >/dev/null 2>&1 || true
+    else
+      echo "### Health Check - Failure (stage: $SYNC_STAGE, exit: $rc) ###"
+      curl -fsS -m 10 --retry 5 \
+        --data-raw "bitwarden-sync failed at stage '$SYNC_STAGE' (exit $rc)" \
+        "$HEALTHCHECK_URL/$HEALTHCHECK_PING/fail?rid=$RID" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
 # Attempt config -> login -> unlock against the source with the currently
 # installed bw-old, retrying transient transport failures (e.g. undici
 # "Premature close") with backoff. The real CLI error is captured and surfaced
@@ -177,6 +229,35 @@ resolve_device_identifier() {
 # Persist Bitwarden CLI state to keep a stable device identity between runs.
 export BITWARDENCLI_APPDATA_DIR="${BITWARDENCLI_APPDATA_DIR:-/app/data/bitwarden-cli}"
 mkdir -p "$BITWARDENCLI_APPDATA_DIR"
+
+# --- Run state + observability -------------------------------------------------
+MAIN_PID="$$"
+START_EPOCH=$(date +%s)
+START_TIME=$(date)
+RID=$(uuidgen)
+SYNC_STATUS="error" # flipped to "success" only after a clean finish
+SYNC_STAGE="init"   # last stage reached; recorded on failure for debugging
+BACKUP_ITEMS=0
+BACKUP_FOLDERS=0
+CLI_SOURCE_VERSION="unknown"
+CLI_DEST_VERSION="unknown"
+BW_STATUS_FILE="${BW_STATUS_FILE:-$BITWARDENCLI_APPDATA_DIR/last-run.json}"
+LOCK_FILE="${BW_LOCK_FILE:-$BITWARDENCLI_APPDATA_DIR/bitwarden-sync.lock}"
+
+# Prevent overlapping runs (a manual `docker exec ... /app/script.sh` colliding
+# with cron, or a run that outlasts the next scheduled tick). Best-effort.
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$LOCK_FILE" || true
+  if ! flock -n 9; then
+    echo "# A bitwarden-sync run is already in progress (lock: $LOCK_FILE); skipping. #" >&2
+    exit 0
+  fi
+fi
+
+# From here on, finish() runs on exit to record status + ping the healthcheck.
+trap finish EXIT
+# ------------------------------------------------------------------------------
+
 if ! resolve_device_identifier; then
   exit 1
 fi
@@ -229,16 +310,12 @@ BW_TAR_PASS=$(resolve_secret BW_TAR_PASS)
 BW_PASS_SOURCE=$(resolve_secret BW_PASS_SOURCE)
 BW_PASS_DEST=$(resolve_secret BW_PASS_DEST)
 
-# Set start time
-START_TIME=$(date)
 echo "### Bitwarden Script - Start ###"
 echo "# Start Time: $START_TIME #"
 echo "################################"
 
 export BW_CLIENTID=${BW_CLIENTID_SOURCE}
 export BW_CLIENTSECRET=${BW_CLIENTSECRET_SOURCE}
-
-RID=`uuidgen`
 
 # Check if HEALTHCHECK_URL and HEALTHCHECK_PING are set
 if [ -n "$HEALTHCHECK_URL" ] && [ -n "$HEALTHCHECK_PING" ]; then
@@ -275,25 +352,36 @@ rm -f -R $SOURCE_EXPORT_OUTPUT_BASE*.json
 
 # Login to our Server (using old CLI for Vaultwarden compatibility) and unlock.
 # source_login_unlock handles logout/config/login/unlock with retry + backoff.
+SYNC_STAGE="source_login"
 echo "# Logging into Source Bitwarden Server (using CLI $(bw-old --version 2>/dev/null || echo unknown))... #"
 echo "# Unlocking the vault... #"
 if ! source_login_unlock; then
   echo "# ERROR: Failed to unlock source vault #"
   exit 1
 fi
-echo "# Vault unlocked #"
+CLI_SOURCE_VERSION="$(bw-old --version 2>/dev/null || echo unknown)"
+echo "# Vault unlocked (source CLI $CLI_SOURCE_VERSION) #"
 
 # Export out all items
+SYNC_STAGE="source_export"
 echo "# Exporting all items... #"
-bw-old --session $BW_SESSION_SOURCE --raw export --format json > $SOURCE_OUTPUT_FILE_JSON
+if ! bw-old --session "$BW_SESSION_SOURCE" --raw export --format json > "$SOURCE_OUTPUT_FILE_JSON"; then
+  echo "# ERROR: Failed to export source vault #" >&2
+  rm -f "$SOURCE_OUTPUT_FILE_JSON"
+  exit 1
+fi
+BACKUP_ITEMS=$(jq '.items | length' "$SOURCE_OUTPUT_FILE_JSON" 2>/dev/null || echo 0)
+BACKUP_FOLDERS=$(jq '.folders | length' "$SOURCE_OUTPUT_FILE_JSON" 2>/dev/null || echo 0)
+echo "# Exported $BACKUP_ITEMS items, $BACKUP_FOLDERS folders #"
 
 # Add file to encrypted tar
+SYNC_STAGE="backup_encrypt"
 file_to_compress="$SOURCE_OUTPUT_FILE_JSON"
 tar -czf - "$file_to_compress" | \
   openssl enc -aes-256-cbc -pbkdf2 -pass pass:"$BW_TAR_PASS" -out "/app/backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.tar.gz.enc"
 
 # Cleanup
-rm -f $SOURCE_OUTPUT_FILE_JSON
+rm -f "$SOURCE_OUTPUT_FILE_JSON"
 
 echo "# End of Backup Process #"
 echo "### Backup - End ###"
@@ -322,7 +410,9 @@ echo "# Logging out from Bitwarden... #"
 bw-new logout 2>/dev/null || true
 
 # Logging into the destination server (using new CLI for Bitwarden Cloud)
-echo "# Logging into Destination Bitwarden Server (using latest CLI)... #"
+SYNC_STAGE="dest_login"
+CLI_DEST_VERSION="$(bw-new --version 2>/dev/null || echo unknown)"
+echo "# Logging into Destination Bitwarden Server (using CLI $CLI_DEST_VERSION)... #"
 bw-new logout 2>/dev/null || true
 bw-new config server $BW_SERVER_DEST
 bw-new login --apikey
@@ -354,6 +444,7 @@ fi
 
 # Clear the destination vault via Bitwarden REST API (no PTY/CLI needed for deletion).
 # Bulk-deleting via API is orders of magnitude faster than per-item bw-new calls.
+SYNC_STAGE="dest_token"
 echo "# Getting API access token... #"
 BW_CLIENT_VERSION=$(bw-new --version 2>/dev/null || printf '%s' "unknown")
 if ! TOKEN_RESPONSE=$(curl_api --fail -X POST "$DEST_IDENTITY_URL/connect/token" \
@@ -380,6 +471,7 @@ if [ -z "$API_TOKEN" ]; then
 fi
 echo "# API token obtained #"
 
+SYNC_STAGE="dest_fetch"
 echo "# Fetching existing vault contents... #"
 if ! SYNC_DATA=$(curl_api --fail "$DEST_API_URL/sync?excludeDomains=true" \
   -H "Authorization: Bearer $API_TOKEN"); then
@@ -408,6 +500,7 @@ echo "# Existing destination: $CIPHER_COUNT ciphers, $FOLDER_COUNT folders #"
 
 # Bulk delete all personal ciphers in batches of 500 (API limit)
 # Soft-delete only; Bitwarden auto-purges trash after 30 days
+SYNC_STAGE="dest_clear"
 if [ "$CIPHER_COUNT" -gt 0 ]; then
   echo "# Bulk deleting $CIPHER_COUNT ciphers (batches of 500)... #"
   OFFSET=0
@@ -453,6 +546,7 @@ for id in "${DEST_FOLDER_IDS[@]}"; do
 done
 
 # Import via a single PTY call — bw import prompts for master password exactly once
+SYNC_STAGE="import"
 echo "# Importing backup into destination vault... #"
 IMPORT_OUT=$(printf "%s\n" "$BW_PASS_DEST" | \
   script -qfc "bw-new --session \"$BW_SESSION_DEST\" import bitwardenjson \"$DEST_LATEST_BACKUP_JSON\"" \
@@ -478,13 +572,7 @@ bw-new logout > /dev/null 2>&1 || true
 unset BW_CLIENTID
 unset BW_CLIENTSECRET
 
-# Check if HEALTHCHECK_URL and HEALTHCHECK_PING are set
-if [ -n "$HEALTHCHECK_URL" ] && [ -n "$HEALTHCHECK_PING" ]; then
-    # send the success ping, use the same rid parameter:
-    echo "### Health Check - Success ###"
-    echo "# Success Ping URL: $URL/$PING?rid=$RID #"
-    curl -fsS -m 10 --retry 5 $URL/$PING?rid=$RID
-    echo "### Health Check - End ###"
-else
-    echo "# Skipping health check as HEALTHCHECK_URL or HEALTHCHECK_PING is not set. #"
-fi
+# Mark success — finish() (EXIT trap) writes the status file, prints the run
+# summary, and sends the healthcheck success ping.
+SYNC_STAGE="done"
+SYNC_STATUS="success"

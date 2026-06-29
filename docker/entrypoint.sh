@@ -46,4 +46,13 @@ if ! reconcile_clis; then
   echo "# WARNING: Failed to reconcile Bitwarden CLI versions; using baked-in (source $(bw-old --version 2>/dev/null), destination $(bw-new --version 2>/dev/null)) #" >&2
 fi
 
+# Optionally run one sync immediately at container start (useful for first-time
+# setup / testing) before handing off to cron.
+case "${RUN_ON_START:-}" in
+  1 | true | TRUE | yes | YES | on | ON)
+    echo "# RUN_ON_START set — running an initial sync now #"
+    /app/script.sh || echo "# Initial sync exited non-zero (rc=$?) #" >&2
+    ;;
+esac
+
 exec "$@"

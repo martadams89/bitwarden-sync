@@ -13,6 +13,14 @@ services:
     restart: always
     environment:
       - CRON_SCHEDULE=0 0 * * *
+      # Run one sync immediately on container start (handy for first-run/testing),
+      # then continue on the cron schedule:
+      # - RUN_ON_START=true
+      #
+      # Force a run any time without waiting for cron:
+      #   docker compose exec bitwarden-sync /app/script.sh
+      # A flock guard prevents it from overlapping a scheduled run. Each run
+      # writes its outcome to <BITWARDENCLI_APPDATA_DIR>/last-run.json.
       # Optional: override the Bitwarden CLI version at RUNTIME (works on the
       # published image, no rebuild needed). The entrypoint reinstalls only when
       # a concrete version differs from the baked-in default (source 2025.12.0,

@@ -279,6 +279,43 @@ A wrong master password or an auth/API-key error stops immediately — cycling
 versions cannot fix those. This fallback is **Docker-only** (it relies on the
 image's npm-managed CLI).
 
+### Manual runs & monitoring
+
+**Force a run now** (no need to wait for cron):
+
+```bash
+docker compose exec bitwarden-sync /app/script.sh
+# or: docker exec -it bitwarden-sync /app/script.sh
+```
+
+A `flock` guard ensures a manual run can't overlap a scheduled one (two
+concurrent runs both clearing+importing the destination would be bad). Set
+`RUN_ON_START=true` to run one sync automatically at container start.
+
+**Run status.** Every run writes a summary line to the logs and a machine-readable
+`last-run.json` into the CLI state directory
+(`<BITWARDENCLI_APPDATA_DIR>/last-run.json`), e.g.:
+
+```json
+{
+  "status": "success",
+  "stage": "done",
+  "duration_seconds": 42,
+  "exit_code": 0,
+  "backup": { "items": 312, "folders": 9 },
+  "cli": { "source": "2025.12.0", "destination": "2026.6.0" }
+}
+```
+
+On failure, `status` is `error` and `stage` shows where it stopped (e.g.
+`source_login`, `import`) — handy for debugging.
+
+**Logs & alerting.** The container logs everything to stdout, so `docker logs`
+(or [Dozzle](https://dozzle.dev) / Loki) gives you live logs and history.
+Configure `HEALTHCHECK_URL` / `HEALTHCHECK_PING` ([Healthchecks.io](https://healthchecks.io)
+or self-hosted) for run history and alerting — the container pings `start` on
+launch, the success URL when done, and `/fail` if a run errors out.
+
 ## Standalone Script
 
 Prefer the [standalone script](bitwarden_sync.sh) over Docker? It behaves the
@@ -416,7 +453,10 @@ environment:
 | `BW_TAR_PASS`                                                   | both       | —                         | Encryption password for backup archives (also `_FILE`, `_ENC_FILE`/`_KEYFILE`) |
 | `BW_API_URL_DEST` / `BW_IDENTITY_URL_DEST`                      | both       | derived                   | Override destination endpoints (non-standard proxies only)                     |
 | `CRON_SCHEDULE`                                                 | Docker     | `57 23 * * *`             | Cron expression for the scheduled run                                          |
+| `RUN_ON_START`                                                  | Docker     | unset                     | Run one sync at container start, then continue on cron                         |
 | `BITWARDENCLI_APPDATA_DIR`                                      | Docker     | `/app/data/bitwarden-cli` | CLI state directory (persist via volume)                                       |
+| `BW_STATUS_FILE`                                                | Docker     | `<appdata>/last-run.json` | Where the per-run status JSON is written                                       |
+| `BW_LOCK_FILE`                                                  | Docker     | `<appdata>/…sync.lock`    | flock file preventing overlapping runs                                         |
 | `BITWARDEN_SYNC_STATE_DIR`                                      | standalone | `./.bitwarden-sync`       | State directory beside the script                                              |
 | `BW_BACKUP_DIR`                                                 | standalone | `./backups`               | Where encrypted archives are written                                           |
 | `BW_DEVICE_IDENTIFIER` / `BW_DEVICE_NAME`                       | both       | generated                 | Fixed REST device identity                                                     |
@@ -425,7 +465,7 @@ environment:
 | `BW_LOGIN_RETRIES` / `BW_LOGIN_RETRY_DELAY`                     | both       | `3` / `5`                 | Source login retry count / initial backoff (s)                                 |
 | `BW_API_CONNECT_TIMEOUT` / `BW_API_MAX_TIME` / `BW_API_RETRIES` | both       | `10` / `60` / `3`         | REST `curl` connect timeout / max time / retries                               |
 | `BW_IMPORT_LIMIT`                                               | both       | unset                     | Import only N items per type (testing)                                         |
-| `HEALTHCHECK_URL` / `HEALTHCHECK_PING`                          | both       | unset                     | [Healthchecks.io](https://healthchecks.io) start/success pings                 |
+| `HEALTHCHECK_URL` / `HEALTHCHECK_PING`                          | both       | unset                     | [Healthchecks.io](https://healthchecks.io) pings (Docker also pings `/fail`)   |
 
 ## Testing with a Subset
 
