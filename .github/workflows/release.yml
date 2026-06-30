@@ -22,6 +22,14 @@ concurrency:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    env:
+      # Add a RELEASE_PLEASE_TOKEN PAT (or GitHub App token) to get fully
+      # automatic releases: the release PR is then created by that token, so its
+      # CI checks actually run and it can auto-merge. Without it, this falls back
+      # to GITHUB_TOKEN — release PRs still open automatically, but you click
+      # "merge" yourself (GITHUB_TOKEN-created PRs don't trigger CI, so a required
+      # check would otherwise never report and auto-merge could never complete).
+      HAS_RP_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
     outputs:
       # Manifest mode prefixes per-package outputs with the path ("." here).
       release_created: ${{ steps.rp.outputs['.--release_created'] }}
@@ -32,7 +40,13 @@ jobs:
       - id: rp
         uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge the release PR
+        if: ${{ steps.rp.outputs.pr && env.HAS_RP_TOKEN == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: gh pr merge --auto --squash "${{ fromJson(steps.rp.outputs.pr).number }}"
 
   publish:
     needs: release-please
