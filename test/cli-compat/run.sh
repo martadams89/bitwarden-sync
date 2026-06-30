@@ -77,6 +77,7 @@ docker run --rm --network host \
   -e BW_TAR_PASS="cli-compat-test" \
   -e BITWARDENCLI_APPDATA_DIR="/tmp/bw" \
   -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+  -e NODE_OPTIONS="--no-deprecation --no-warnings" \
   "$IMAGE_TAG" /app/script.sh 2>&1 | tee "$LOG"
 rc=${PIPESTATUS[0]}
 set -e
