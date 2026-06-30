@@ -11,11 +11,23 @@ on:
   pull_request:
     branches:
       - main
+  # Push to main only: validates main and seeds the device-id cache that PRs
+  # restore (PRs can read caches from main, not from each other). Feature-branch
+  # pushes are already covered by their PR, so running on every branch is waste.
   push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# Serialize repo-wide: a heavy run clears + re-imports the shared throwaway cloud
+# destination, so two overlapping runs would corrupt each other's vault. Queue
+# rather than cancel — cancelling mid-sync could leave the dest half-cleared.
+concurrency:
+  group: cli-compat
+  cancel-in-progress: false
 
 jobs:
   cli-compat:
@@ -23,6 +35,7 @@ jobs:
     # protection. Keep it in sync with that setting.
     name: CLI Compatibility Test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
@@ -30,20 +43,36 @@ jobs:
 
       - name: Detect CLI-relevant changes
         id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "relevant=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if git diff --name-only \
-              "${{ github.event.pull_request.base.sha }}" \
-              "${{ github.event.pull_request.head.sha }}" \
+          case "$EVENT" in
+            pull_request) base="$PR_BASE"; head="$PR_HEAD" ;;
+            push)         base="$PUSH_BEFORE"; head="$PUSH_AFTER" ;;
+            *)            echo "relevant=true" >> "$GITHUB_OUTPUT"; exit 0 ;;  # manual dispatch
+          esac
+          # New branch / unknown base (all-zero SHA) → can't diff, run to be safe.
+          case "$base" in "" | 0000000000000000000000000000000000000000)
+            echo "relevant=true" >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
+          if git diff --name-only "$base" "$head" \
               | grep -qE '^(docker/|test/cli-compat/|\.github/workflows/cli-compat-test\.yml$)'; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
             echo "relevant=false" >> "$GITHUB_OUTPUT"
             echo "No CLI/Vaultwarden-relevant changes — reporting success without running the sync."
           fi
+
+      - name: Cache Bitwarden CLI state (stable device id → no "new device" emails)
+        if: steps.filter.outputs.relevant == 'true'
+        uses: actions/cache@v4
+        with:
+          path: test/cli-compat/.bw-appdata
+          key: cli-compat-bw-appdata
 
       - name: Run CLI compatibility test
         if: steps.filter.outputs.relevant == 'true'
