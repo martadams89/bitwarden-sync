@@ -1,5 +1,5 @@
 # Alpine base image. Pinned for reproducible builds; Renovate keeps it current.
-FROM alpine:3.21
+FROM alpine:3.24
 
 # Set working directory
 WORKDIR /app
