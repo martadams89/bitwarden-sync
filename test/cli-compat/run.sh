@@ -79,8 +79,13 @@ ADD_HOSTS=()
 dest_host=$(printf '%s' "${BW_SERVER_DEST:-}" | sed -E 's#^[a-z]+://##; s#[:/].*$##')
 for h in "$dest_host" "${dest_host/vault./api.}" "${dest_host/vault./identity.}"; do
   [ -n "$h" ] || continue
-  ip=$(getent ahostsv4 "$h" 2>/dev/null | awk 'NR==1{print $1}')
-  [ -n "$ip" ] && ADD_HOSTS+=(--add-host "$h:$ip")
+  # `|| true` inside the subshell so a getent miss can't trip `set -e`.
+  ip=$(getent ahostsv4 "$h" 2>/dev/null | awk 'NR==1{print $1}' || true)
+  if [ -n "$ip" ]; then
+    ADD_HOSTS+=(--add-host "$h:$ip")
+  else
+    echo "# WARN: host could not resolve $h #" >&2
+  fi
 done
 echo "# Pinned destination hosts: ${ADD_HOSTS[*]:-none} #"
 
