@@ -43,20 +43,26 @@ VW_DATA_DIR=$(mktemp -d)
 cp -a "$HERE/vaultwarden-data/." "$VW_DATA_DIR/"
 export VW_DATA_DIR
 
+# The bw CLI rejects http:// servers, so Vaultwarden serves HTTPS with a throwaway
+# self-signed cert (referenced by ROCKET_TLS in docker-compose.yml).
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout "$VW_DATA_DIR/key.pem" -out "$VW_DATA_DIR/cert.pem" \
+  -subj "/CN=localhost" >/dev/null 2>&1
+
 cleanup() {
   docker compose -f "$COMPOSE" down >/dev/null 2>&1 || true
   rm -rf "$VW_DATA_DIR"
 }
 trap cleanup EXIT
 
-# 1. Start Vaultwarden and wait for readiness.
+# 1. Start Vaultwarden and wait for readiness (HTTPS, self-signed → curl -k).
 docker compose -f "$COMPOSE" up -d
 echo "# Waiting for Vaultwarden... #"
 for _ in $(seq 1 30); do
-  curl -fsS "http://localhost:$PORT/alive" >/dev/null 2>&1 && break
+  curl -fsSk "https://localhost:$PORT/alive" >/dev/null 2>&1 && break
   sleep 2
 done
-curl -fsS "http://localhost:$PORT/alive" >/dev/null || fail "Vaultwarden did not become ready"
+curl -fsSk "https://localhost:$PORT/alive" >/dev/null || fail "Vaultwarden did not become ready"
 
 # 2. Build the image from the current checkout (uses the PR's pinned CLI versions).
 docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
@@ -65,11 +71,12 @@ docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
 LOG=$(mktemp)
 set +e
 docker run --rm --network host \
-  -e BW_SERVER_SOURCE="http://localhost:$PORT" \
+  -e BW_SERVER_SOURCE="https://localhost:$PORT" \
   -e BW_CLIENTID_SOURCE -e BW_CLIENTSECRET_SOURCE -e BW_PASS_SOURCE \
   -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
   -e BW_TAR_PASS="cli-compat-test" \
   -e BITWARDENCLI_APPDATA_DIR="/tmp/bw" \
+  -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
   "$IMAGE_TAG" /app/script.sh 2>&1 | tee "$LOG"
 rc=${PIPESTATUS[0]}
 set -e

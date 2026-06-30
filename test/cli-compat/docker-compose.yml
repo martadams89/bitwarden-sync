@@ -12,6 +12,9 @@ services:
     environment:
       - ROCKET_PORT=80
       - SIGNUPS_ALLOWED=false
+      # The Bitwarden CLI refuses plain-HTTP servers ("All URLs must use HTTPS"),
+      # so serve TLS with a self-signed cert that run.sh drops into the volume.
+      - 'ROCKET_TLS={certs="/data/cert.pem",key="/data/key.pem"}'
     ports:
       - "127.0.0.1:8000:80"
     volumes:
