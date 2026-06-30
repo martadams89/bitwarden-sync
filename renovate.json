@@ -2,10 +2,10 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":dependencyDashboard"],
   "description": [
-    "platformAutomerge is false on purpose: with no branch protection, GitHub-native auto-merge would merge before the CLI Compatibility Test finishes. Renovate-managed auto-merge instead waits for all branch checks to pass first."
+    "platformAutomerge uses GitHub-native auto-merge, which is gated by branch protection: 'Allow auto-merge' is enabled and main requires the 'CLI Compatibility Test' check, so a bump only merges once that check is green. The check runs on every PR (skipping the heavy sync when irrelevant) so it never blocks unrelated PRs."
   ],
   "automerge": true,
-  "platformAutomerge": false,
+  "platformAutomerge": true,
   "ignorePaths": [
     "**/node_modules/**",
     "**/bower_components/**",
@@ -27,7 +27,7 @@
   ],
   "packageRules": [
     {
-      "description": "Group both pinned Bitwarden CLI ARGs into one PR. Auto-merge waits for the CLI Compatibility Test (Renovate-managed auto-merge holds until branch checks pass).",
+      "description": "Group both pinned Bitwarden CLI ARGs into one PR. Auto-merge is gated by the required CLI Compatibility Test check on main.",
       "matchDepNames": ["@bitwarden/cli"],
       "groupName": "bitwarden-cli",
       "commitMessageTopic": "Bitwarden CLI",
