@@ -1,0 +1,21 @@
+name: Keepalive
+
+# GitHub auto-disables scheduled workflows after 60 days of repository inactivity.
+# During a quiet stretch (e.g. no dependency PRs for months) that would silently
+# kill the weekly docker.yml maintenance rebuild. This keeps scheduled workflows
+# enabled. Runs well inside the 60-day window.
+
+on:
+  schedule:
+    - cron: "0 6 1,15 * *" # 1st and 15th of each month
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: liskin/gh-workflow-keepalive@v1
