@@ -1,19 +1,17 @@
 name: CLI Compatibility Test
 
-# Runs entirely on the runner: starts a throwaway Vaultwarden (pinned,
-# Renovate-managed image) from the committed seed volume, builds the image from
-# the PR, and runs a real source->dest sync between two seeded accounts. This is
-# the green check Renovate waits for before auto-merging an @bitwarden/cli or
-# vaultwarden/server bump. One-time setup (6 secrets + seed): test/cli-compat/README.md.
+# Gates auto-merge of @bitwarden/cli and vaultwarden/server bumps. It runs on
+# EVERY PR to main (so it can safely be a required status check), but only does
+# the heavy work — start a throwaway Vaultwarden from the seed volume, build the
+# image from the PR, run a real source->dest sync — when CLI/Vaultwarden-relevant
+# paths changed. Otherwise it reports success immediately so unrelated PRs aren't
+# blocked. One-time setup (7 secrets + seed): test/cli-compat/README.md.
 
 on:
   pull_request:
     branches:
       - main
-    paths:
-      - "docker/**"
-      - "test/cli-compat/**"
-      - ".github/workflows/cli-compat-test.yml"
+  push:
   workflow_dispatch:
 
 permissions:
@@ -21,11 +19,34 @@ permissions:
 
 jobs:
   cli-compat:
+    # This name is the status-check context to mark "required" in branch
+    # protection. Keep it in sync with that setting.
+    name: CLI Compatibility Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect CLI-relevant changes
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only \
+              "${{ github.event.pull_request.base.sha }}" \
+              "${{ github.event.pull_request.head.sha }}" \
+              | grep -qE '^(docker/|test/cli-compat/|\.github/workflows/cli-compat-test\.yml$)'; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+            echo "No CLI/Vaultwarden-relevant changes — reporting success without running the sync."
+          fi
 
       - name: Run CLI compatibility test
+        if: steps.filter.outputs.relevant == 'true'
         env:
           # Source = in-CI Vaultwarden (seeded volume); server URL is localhost
           # and set inside run.sh, so no source server secret is needed.
