@@ -71,8 +71,11 @@ docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
 LOG=$(mktemp)
 set +e
 # Join the Vaultwarden compose network: reaches the source by service name
-# ("vaultwarden") and keeps working DNS for the external cloud destination.
+# ("vaultwarden"). Explicit --dns gives the embedded resolver a working upstream
+# for the external cloud destination (the runner's 127.0.0.53 stub can't be
+# forwarded to), while service-name resolution still works via 127.0.0.11.
 docker run --rm --network cli-compat-net \
+  --dns 1.1.1.1 --dns 8.8.8.8 \
   -e BW_SERVER_SOURCE="https://vaultwarden:80" \
   -e BW_CLIENTID_SOURCE -e BW_CLIENTSECRET_SOURCE -e BW_PASS_SOURCE \
   -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
