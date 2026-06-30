@@ -26,6 +26,13 @@ COMPOSE="$HERE/docker-compose.yml"
 IMAGE_TAG="${IMAGE_TAG:-bitwarden-sync:cli-compat}"
 PORT="${PORT:-8000}"
 
+# Persisted Bitwarden CLI state (the bw-new CLI's own device id lives here). The
+# workflow caches this dir so the cloud dest sees the same device every run and
+# stops emailing "new device logged in". Paired with the fixed BW_DEVICE_IDENTIFIER
+# below, which covers the separate REST API-key login.
+APPDATA="${BW_CLI_APPDATA:-$HERE/.bw-appdata}"
+mkdir -p "$APPDATA"
+
 fail() { echo "::error::$*" >&2; exit 1; }
 
 # Source = the in-CI Vaultwarden (seeded volume); dest = real Bitwarden Cloud.
@@ -102,13 +109,21 @@ docker run --rm --network host \
   -e BW_SERVER_SOURCE="https://localhost:$PORT" \
   -e BW_CLIENTID_SOURCE -e BW_CLIENTSECRET_SOURCE -e BW_PASS_SOURCE \
   -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
+  -v "$APPDATA":/bw-appdata \
   -e BW_TAR_PASS="cli-compat-test" \
-  -e BITWARDENCLI_APPDATA_DIR="/tmp/bw" \
+  -e BITWARDENCLI_APPDATA_DIR=/bw-appdata \
+  -e BW_DEVICE_IDENTIFIER="${BW_DEVICE_IDENTIFIER:-7b9e6f1c-2a3d-4e5f-8a9b-0c1d2e3f4a5b}" \
+  -e BW_DEVICE_NAME="${BW_DEVICE_NAME:-bitwarden-sync-ci}" \
   -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
   -e NODE_OPTIONS="--no-deprecation --no-warnings" \
   "$IMAGE_TAG" /app/script.sh 2>&1 | tee "$LOG"
 rc=${PIPESTATUS[0]}
 set -e
+
+# The CLI state was written as root; chown it back so the workflow cache can save
+# it (and so local re-runs aren't blocked by root-owned files).
+docker run --rm --entrypoint chown -v "$APPDATA":/bw-appdata "$IMAGE_TAG" \
+  -R "$(id -u):$(id -g)" /bw-appdata >/dev/null 2>&1 || true
 
 # 4. Assert.
 [ "$rc" -eq 0 ] || fail "sync exited with code $rc"
