@@ -68,32 +68,23 @@ curl -fsSk "https://localhost:$PORT/alive" >/dev/null || fail "Vaultwarden did n
 docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
 
 # 3. Run one sync: source = in-CI Vaultwarden, dest = Bitwarden Cloud.
-# Build the container's DNS list. GitHub-hosted (Azure) runners put an unusable
-# systemd-resolved stub (127.0.0.53) in /etc/resolv.conf and block container
-# egress to public DNS, so prefer the host's *real* upstream resolvers from
-# /run/systemd/resolve/resolv.conf, then add public fallbacks for other runners.
-DNS_ARGS=()
-for resolv in /run/systemd/resolve/resolv.conf /etc/resolv.conf; do
-  [ -r "$resolv" ] || continue
-  while read -r kw addr _; do
-    [ "$kw" = "nameserver" ] || continue
-    case "$addr" in 127.* | ::1 | "") continue ;; esac
-    DNS_ARGS+=(--dns "$addr")
-  done < "$resolv"
-  [ ${#DNS_ARGS[@]} -gt 0 ] && break
-done
-DNS_ARGS+=(--dns 1.1.1.1 --dns 8.8.8.8)
-echo "# Container DNS: ${DNS_ARGS[*]} #"
+# Networking: use --network host so the container shares the runner's netns — the
+# only way to reach both the published Vaultwarden (localhost) and, on GitHub's
+# Azure runners, the internet + Azure's resolver 168.63.129.16 (which is NOT
+# routable from a Docker bridge container). The catch is that the host's
+# /etc/resolv.conf is the 127.0.0.53 systemd-resolved stub, which musl libc in
+# the container can't use — so mount the real upstream resolvers over it.
+RESOLV_MOUNT=()
+if [ -r /run/systemd/resolve/resolv.conf ]; then
+  RESOLV_MOUNT=(-v /run/systemd/resolve/resolv.conf:/etc/resolv.conf:ro)
+  echo "# Using host upstream resolvers (/run/systemd/resolve/resolv.conf) #"
+fi
 
 LOG=$(mktemp)
 set +e
-# Default bridge: --dns writes the container's resolv.conf directly (no embedded
-# resolver), giving working external DNS for the cloud destination. The source
-# Vaultwarden is reached via the Docker host gateway (its published 8000 port).
-docker run --rm \
-  --add-host=host.docker.internal:host-gateway \
-  "${DNS_ARGS[@]}" \
-  -e BW_SERVER_SOURCE="https://host.docker.internal:8000" \
+docker run --rm --network host \
+  "${RESOLV_MOUNT[@]}" \
+  -e BW_SERVER_SOURCE="https://localhost:$PORT" \
   -e BW_CLIENTID_SOURCE -e BW_CLIENTSECRET_SOURCE -e BW_PASS_SOURCE \
   -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
   -e BW_TAR_PASS="cli-compat-test" \
