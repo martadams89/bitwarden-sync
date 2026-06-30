@@ -16,6 +16,14 @@ services:
       # so serve TLS with a self-signed cert that run.sh drops into the volume.
       - 'ROCKET_TLS={certs="/data/cert.pem",key="/data/key.pem"}'
     ports:
+      # Published only so run.sh can probe readiness from the host.
       - "127.0.0.1:8000:80"
     volumes:
       - ${VW_DATA_DIR:-./vaultwarden-data}:/data
+
+# Fixed network name so the sync container can join it and reach Vaultwarden by
+# service name. A user-defined bridge also gives the sync container working DNS
+# for the external cloud destination (host networking did not).
+networks:
+  default:
+    name: cli-compat-net

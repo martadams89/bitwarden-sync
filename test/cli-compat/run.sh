@@ -70,8 +70,10 @@ docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
 # 3. Run one sync: source = in-CI Vaultwarden, dest = Bitwarden Cloud.
 LOG=$(mktemp)
 set +e
-docker run --rm --network host \
-  -e BW_SERVER_SOURCE="https://localhost:$PORT" \
+# Join the Vaultwarden compose network: reaches the source by service name
+# ("vaultwarden") and keeps working DNS for the external cloud destination.
+docker run --rm --network cli-compat-net \
+  -e BW_SERVER_SOURCE="https://vaultwarden:80" \
   -e BW_CLIENTID_SOURCE -e BW_CLIENTSECRET_SOURCE -e BW_PASS_SOURCE \
   -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
   -e BW_TAR_PASS="cli-compat-test" \
