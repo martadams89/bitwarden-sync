@@ -23,7 +23,7 @@ jobs:
       actions: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           # Make sure the actual branch is checked out when running on pull requests
           ref: ${{ github.head_ref }}
@@ -47,13 +47,13 @@ jobs:
       #     cmd: prettier --write . --ignore-path .prettierignore --ignore-unknown
 
       - name: Prettify code
-        uses: creyD/prettier_action@v4.6
+        uses: creyD/prettier_action@8c18391fdc98ed0d884c6345f03975edac71b8f0 # v4.6
         with:
           # This part is also where you can pass other options, for example:
           prettier_options: --write . --ignore-path .prettierignore --ignore-unknown
           only_changed: True # only run on new commits
 
-      - uses: peter-evans/create-pull-request@v8
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
           author: ${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>
