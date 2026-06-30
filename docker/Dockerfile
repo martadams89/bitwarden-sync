@@ -19,10 +19,10 @@ ENV NODE_OPTIONS="--no-deprecation"
 # Bitwarden Cloud import.
 # Source / Vaultwarden compatibility (issue #50):
 # renovate: datasource=npm depName=@bitwarden/cli
-ARG BW_CLI_OLD_VERSION=2025.12.0
+ARG BW_CLI_OLD_VERSION=2025.12.1
 # Destination / Bitwarden cloud:
 # renovate: datasource=npm depName=@bitwarden/cli
-ARG BW_CLI_NEW_VERSION=2025.12.0
+ARG BW_CLI_NEW_VERSION=2025.12.1
 # Bridge the build args to env vars so they can be overridden at runtime too.
 ENV BW_CLI_OLD_VERSION=${BW_CLI_OLD_VERSION} \
     BW_CLI_NEW_VERSION=${BW_CLI_NEW_VERSION}
