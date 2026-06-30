@@ -104,6 +104,8 @@ docker run --rm --network host \
   -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
   -e BW_TAR_PASS="cli-compat-test" \
   -e BITWARDENCLI_APPDATA_DIR="/tmp/bw" \
+  -e BW_DEVICE_IDENTIFIER="${BW_DEVICE_IDENTIFIER:-7b9e6f1c-2a3d-4e5f-8a9b-0c1d2e3f4a5b}" \
+  -e BW_DEVICE_NAME="${BW_DEVICE_NAME:-bitwarden-sync-ci}" \
   -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
   -e NODE_OPTIONS="--no-deprecation --no-warnings" \
   "$IMAGE_TAG" /app/script.sh 2>&1 | tee "$LOG"
