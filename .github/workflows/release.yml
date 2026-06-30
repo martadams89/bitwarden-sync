@@ -1,0 +1,90 @@
+name: Release
+
+# Conventional commits on main drive this. release-please keeps a "release PR"
+# open with the next semver + changelog; merging it creates the git tag and the
+# GitHub Release, and (in the SAME run — so no GITHUB_TOKEN "downstream workflow"
+# gotcha) builds and pushes the versioned, multi-arch images to Docker Hub + GHCR.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write # create tags + GitHub Releases
+  pull-requests: write # open/maintain the release PR
+  packages: write # push to GHCR
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      # Manifest mode prefixes per-package outputs with the path ("." here).
+      release_created: ${{ steps.rp.outputs['.--release_created'] }}
+      major: ${{ steps.rp.outputs['.--major'] }}
+      minor: ${{ steps.rp.outputs['.--minor'] }}
+      patch: ${{ steps.rp.outputs['.--patch'] }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        env:
+          V: ${{ needs.release-please.outputs.major }}.${{ needs.release-please.outputs.minor }}.${{ needs.release-please.outputs.patch }}
+          MAJOR: ${{ needs.release-please.outputs.major }}
+          MINOR: ${{ needs.release-please.outputs.minor }}
+        with:
+          images: |
+            martadams89/bitwarden-sync
+            ghcr.io/${{ github.repository_owner }}/bitwarden-sync
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ env.V }}
+            type=raw,value=${{ env.MAJOR }}.${{ env.MINOR }}
+            type=raw,value=${{ env.MAJOR }}
+
+      - name: Build and push (multi-arch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

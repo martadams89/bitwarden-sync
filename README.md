@@ -1,6 +1,7 @@
 # 🔐 Bitwarden / Vaultwarden Sync
 
-[![Build](https://github.com/martadams89/bitwarden-sync/actions/workflows/bitwarden_sync_docker.yml/badge.svg)](https://github.com/martadams89/bitwarden-sync/actions/workflows/bitwarden_sync_docker.yml)
+[![Release](https://github.com/martadams89/bitwarden-sync/actions/workflows/release.yml/badge.svg)](https://github.com/martadams89/bitwarden-sync/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/martadams89/bitwarden-sync?sort=semver)](https://github.com/martadams89/bitwarden-sync/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/martadams89/bitwarden-sync)](https://hub.docker.com/r/martadams89/bitwarden-sync)
 [![Image Size](https://img.shields.io/docker/image-size/martadams89/bitwarden-sync/latest)](https://hub.docker.com/r/martadams89/bitwarden-sync)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -32,6 +33,7 @@ replaces the contents of the **destination** vault with that backup.
 - [How It Works](#how-it-works)
 - [Requirements](#requirements)
 - [Quick Start (Docker)](#quick-start-docker)
+- [Image tags & releases](#image-tags--releases)
 - [Docker Configuration](#docker-configuration)
   - [Passwords & secrets](#passwords--secrets)
   - [Persisting CLI state](#persisting-cli-state)
@@ -120,9 +122,29 @@ See [docker/docker-compose.yml](docker/docker-compose.yml) for the fully
 commented template, and the [Configuration Reference](#configuration-reference)
 for every variable.
 
-> The image is published to both **Docker Hub** (`martadams89/bitwarden-sync`)
-> and **GitHub Container Registry** (`ghcr.io/martadams89/bitwarden-sync`) — use
-> whichever you prefer.
+## Image tags & releases
+
+The image is published to **both** registries (use whichever you prefer):
+
+- Docker Hub — `martadams89/bitwarden-sync`
+- GitHub Container Registry — `ghcr.io/martadams89/bitwarden-sync`
+
+Available tags:
+
+| Tag | Points to | Use it when |
+| --- | --------- | ----------- |
+| `latest` | The newest stable **release** | You want the current stable image (default). |
+| `1`, `1.2`, `1.2.3` | Semver — major / minor / exact | You want to pin updates (e.g. `:1` = all 1.x, `:1.2.3` = frozen). |
+| `edge` | The latest `main` build | You want the bleeding edge between releases. |
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please):
+Conventional-Commit messages on `main` drive the version bump, the `CHANGELOG.md`,
+and a [GitHub Release](https://github.com/martadams89/bitwarden-sync/releases),
+which in turn publishes the versioned images. Base-image security patches are also
+picked up by a weekly rebuild, so `latest`/`edge` stay current even without a release.
+
+> For reproducible deploys, pin a major (e.g. `image: martadams89/bitwarden-sync:1`)
+> rather than `latest`.
 
 ## Docker Configuration
 
