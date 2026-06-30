@@ -1,0 +1,18 @@
+# Throwaway Vaultwarden for the CLI compatibility test, started on the CI runner.
+#
+# The image tag is pinned and Renovate-managed (docker-compose manager), so both
+# @bitwarden/cli bumps AND Vaultwarden bumps are exercised end-to-end before
+# auto-merge. The data volume is a committed seed (two throwaway accounts);
+# run.sh copies it to a temp dir via VW_DATA_DIR so test runs never mutate the
+# repo, and Vaultwarden migrates the seed DB forward when the image is newer.
+services:
+  vaultwarden:
+    image: vaultwarden/server:1.36.0
+    container_name: vw-cli-compat
+    environment:
+      - ROCKET_PORT=80
+      - SIGNUPS_ALLOWED=false
+    ports:
+      - "127.0.0.1:8000:80"
+    volumes:
+      - ${VW_DATA_DIR:-./vaultwarden-data}:/data

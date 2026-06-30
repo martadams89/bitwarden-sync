@@ -181,6 +181,66 @@ source_login_unlock() {
   return 1
 }
 
+# Run the destination import once with the currently installed bw-new. Prints
+# the meaningful output and returns 0 only if the CLI reports a completed import.
+try_import() {
+  local out
+  out=$(printf "%s\n" "$BW_PASS_DEST" | \
+    script -qfc "bw-new --session \"$BW_SESSION_DEST\" import bitwardenjson \"$DEST_LATEST_BACKUP_JSON\"" \
+    /dev/null 2>&1 | tr -d '\r' | sed 's/\x1b\[[0-9;]*[A-Za-z]//g')
+
+  # Show only meaningful lines — filter the echoed password, prompt noise, blanks.
+  printf '%s\n' "$out" | grep -vF "$BW_PASS_DEST" | grep -v '^. Master password' | grep -v '^[[:space:]]*$'
+
+  printf '%s\n' "$out" | grep -qi "imported"
+}
+
+# Import into the destination, auto-falling back across known-good CLI versions
+# if the import fails (e.g. the 2026.x "decryption operation failed" encrypt
+# regression). The installed bw-new is tried first, then each version in
+# BW_CLI_NEW_FALLBACK_VERSIONS (space/comma separated; default below). The vault
+# was already cleared, so retrying only re-imports. Docker-only (needs
+# reinstall_bw_new). On a new version it re-logs-in/unlocks to refresh the session.
+run_import_with_fallback() {
+  local fallbacks="${BW_CLI_NEW_FALLBACK_VERSIONS:-2025.12.0 2024.9.0}"
+  local installed candidates="" v first=1
+  installed="$(bw-new --version 2>/dev/null || echo unknown)"
+
+  candidates="$installed"
+  for v in ${fallbacks//,/ }; do
+    case " $candidates " in *" $v "*) ;; *) candidates="$candidates $v" ;; esac
+  done
+
+  for v in $candidates; do
+    if [ "$first" = 0 ]; then
+      command -v reinstall_bw_new >/dev/null 2>&1 || break
+      echo "# Import failing on destination CLI $installed; switching to $v and retrying... #" >&2
+      if ! reinstall_bw_new "$v"; then
+        echo "# WARNING: Failed to install Bitwarden CLI $v; trying next candidate #" >&2
+        continue
+      fi
+      installed="$(bw-new --version 2>/dev/null || echo "$v")"
+      CLI_DEST_VERSION="$installed"
+      # Refresh the session for the freshly installed CLI version.
+      bw-new logout >/dev/null 2>&1 || true
+      bw-new config server "$BW_SERVER_DEST" >/dev/null 2>&1
+      bw-new login --apikey >/dev/null 2>&1
+      BW_SESSION_DEST=$(bw-new unlock "$BW_PASS_DEST" --raw 2>/dev/null)
+      if [ -z "$BW_SESSION_DEST" ]; then
+        echo "# WARNING: Could not unlock destination with CLI $v; trying next candidate #" >&2
+        continue
+      fi
+    fi
+    first=0
+    if try_import; then
+      return 0
+    fi
+  done
+
+  echo "# ERROR: Import failed on all destination CLI versions tried: $candidates #" >&2
+  return 1
+}
+
 delete_api_resource() {
   local url="$1"
   shift
@@ -545,17 +605,11 @@ for id in "${DEST_FOLDER_IDS[@]}"; do
   echo "# Deleted folder $id (HTTP $STATUS) #"
 done
 
-# Import via a single PTY call — bw import prompts for master password exactly once
+# Import via a single PTY call — bw import prompts for master password exactly
+# once. Auto-falls-back across CLI versions if the import fails.
 SYNC_STAGE="import"
 echo "# Importing backup into destination vault... #"
-IMPORT_OUT=$(printf "%s\n" "$BW_PASS_DEST" | \
-  script -qfc "bw-new --session \"$BW_SESSION_DEST\" import bitwardenjson \"$DEST_LATEST_BACKUP_JSON\"" \
-  /dev/null 2>/dev/null | tr -d '\r' | sed 's/\x1b\[[0-9;]*[A-Za-z]//g')
-
-# Show only meaningful lines — filter echoed password, prompt noise, and blanks
-printf '%s\n' "$IMPORT_OUT" | grep -vF "$BW_PASS_DEST" | grep -v '^. Master password' | grep -v '^[[:space:]]*$'
-
-if ! printf '%s\n' "$IMPORT_OUT" | grep -qi "imported"; then
+if ! run_import_with_fallback; then
   echo "# ERROR: Import did not complete #"
   rm -f "$DEST_LATEST_BACKUP_JSON"
   exit 1

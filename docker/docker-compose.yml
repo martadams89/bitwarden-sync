@@ -9,7 +9,7 @@ services:
     #   dockerfile: docker/Dockerfile
     #   args:
     #     BW_CLI_OLD_VERSION: 2025.12.0   # source / Vaultwarden compatibility
-    #     BW_CLI_NEW_VERSION: latest      # destination / Bitwarden cloud
+    #     BW_CLI_NEW_VERSION: 2025.12.0   # destination / Bitwarden cloud
     restart: always
     environment:
       - CRON_SCHEDULE=0 0 * * *
@@ -23,15 +23,16 @@ services:
       # writes its outcome to <BITWARDENCLI_APPDATA_DIR>/last-run.json.
       # Optional: override the Bitwarden CLI version at RUNTIME (works on the
       # published image, no rebuild needed). The entrypoint reinstalls only when
-      # a concrete version differs from the baked-in default (source 2025.12.0,
-      # destination latest). Pin a known-good source version here if a future
-      # CLI release breaks Vaultwarden again (issue #50):
-      # - BW_CLI_OLD_VERSION=2025.12.0
-      # - BW_CLI_NEW_VERSION=latest
-      # Optional: if the source login fails with a transport error (e.g.
-      # "Premature close"), these source CLI versions are tried in order
-      # (installed version first, then these). Default shown:
+      # a concrete version differs from the baked-in default (2025.12.0 for both).
+      # Pin a known-good version here if a future CLI release breaks the source
+      # login (#50) or the destination import:
+      # - BW_CLI_OLD_VERSION=2025.12.0   # source / Vaultwarden
+      # - BW_CLI_NEW_VERSION=2025.12.0   # destination / Bitwarden cloud
+      # Optional: versions tried (installed first, then these) if the source
+      # login fails with a transport error, or the destination import fails.
+      # Defaults shown:
       # - BW_CLI_OLD_FALLBACK_VERSIONS=2025.12.0 2024.9.0
+      # - BW_CLI_NEW_FALLBACK_VERSIONS=2025.12.0 2024.9.0
       # Optional: source login retry tuning (defaults shown)
       # - BW_LOGIN_RETRIES=3
       # - BW_LOGIN_RETRY_DELAY=5

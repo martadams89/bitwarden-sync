@@ -120,6 +120,10 @@ See [docker/docker-compose.yml](docker/docker-compose.yml) for the fully
 commented template, and the [Configuration Reference](#configuration-reference)
 for every variable.
 
+> The image is published to both **Docker Hub** (`martadams89/bitwarden-sync`)
+> and **GitHub Container Registry** (`ghcr.io/martadams89/bitwarden-sync`) — use
+> whichever you prefer.
+
 ## Docker Configuration
 
 ### Passwords & secrets
@@ -222,13 +226,15 @@ source and destination have different compatibility needs:
 | Wrapper  | Used for                          | Default     | Build arg            |
 | -------- | --------------------------------- | ----------- | -------------------- |
 | `bw-old` | Source (Vaultwarden) login/export | `2025.12.0` | `BW_CLI_OLD_VERSION` |
-| `bw-new` | Destination (Bitwarden cloud)     | `latest`    | `BW_CLI_NEW_VERSION` |
+| `bw-new` | Destination (Bitwarden cloud)     | `2025.12.0` | `BW_CLI_NEW_VERSION` |
 
-The source is pinned to a known-good version because newer CLIs have repeatedly
-broken against self-hosted Vaultwarden — most recently with
-`FetchError: ... /identity/connect/token: Premature close` ([#50](https://github.com/martadams89/bitwarden-sync/issues/50)).
-`2025.12.0` is the current confirmed-working version. Pinning also makes builds
-reproducible.
+Both are pinned to a known-good version because **2026.x CLIs have broken both
+ends**: the Vaultwarden source login with
+`FetchError: ... /identity/connect/token: Premature close` ([#50](https://github.com/martadams89/bitwarden-sync/issues/50)),
+and the Bitwarden Cloud import with `The decryption operation failed` /
+`Failed to encrypt ciphers in batch`. `2025.12.0` is the current confirmed-working
+version for both. Pinning also makes builds reproducible, and Renovate proposes
+bumps (gated by the CLI compatibility test).
 
 **Override at runtime** (recommended — works on the published image, no rebuild).
 The entrypoint reinstalls a CLI only when a _concrete_ version differs from the
@@ -237,7 +243,7 @@ baked-in default, so default startups do no extra work:
 ```yaml
 environment:
   - BW_CLI_OLD_VERSION=2025.12.0 # source / Vaultwarden
-  - BW_CLI_NEW_VERSION=latest # destination / Bitwarden cloud
+  - BW_CLI_NEW_VERSION=2025.12.0 # destination / Bitwarden cloud
 ```
 
 `latest` (or unset) keeps the baked-in build; pinning a concrete version triggers
@@ -248,7 +254,7 @@ a one-time reinstall at container start (needs network access).
 ```bash
 docker build -f docker/Dockerfile \
   --build-arg BW_CLI_OLD_VERSION=2025.12.0 \
-  --build-arg BW_CLI_NEW_VERSION=latest \
+  --build-arg BW_CLI_NEW_VERSION=2025.12.0 \
   -t bitwarden-sync .
 ```
 
@@ -278,6 +284,16 @@ environment:
 A wrong master password or an auth/API-key error stops immediately — cycling
 versions cannot fix those. This fallback is **Docker-only** (it relies on the
 image's npm-managed CLI).
+
+The **destination import** has the same safety net: if `bw import` fails (e.g.
+the 2026.x `decryption operation failed` encrypt regression), the container
+reinstalls the next version from `BW_CLI_NEW_FALLBACK_VERSIONS`, re-logs-in, and
+retries the import:
+
+```yaml
+environment:
+  - BW_CLI_NEW_FALLBACK_VERSIONS=2025.12.0 2024.9.0 # default; space/comma separated
+```
 
 ### Manual runs & monitoring
 
@@ -460,8 +476,9 @@ environment:
 | `BITWARDEN_SYNC_STATE_DIR`                                      | standalone | `./.bitwarden-sync`       | State directory beside the script                                              |
 | `BW_BACKUP_DIR`                                                 | standalone | `./backups`               | Where encrypted archives are written                                           |
 | `BW_DEVICE_IDENTIFIER` / `BW_DEVICE_NAME`                       | both       | generated                 | Fixed REST device identity                                                     |
-| `BW_CLI_OLD_VERSION` / `BW_CLI_NEW_VERSION`                     | Docker     | `2025.12.0` / `latest`    | Source / destination CLI version (build arg + runtime)                         |
-| `BW_CLI_OLD_FALLBACK_VERSIONS`                                  | Docker     | `2025.12.0 2024.9.0`      | Source CLI versions tried on transport failure                                 |
+| `BW_CLI_OLD_VERSION` / `BW_CLI_NEW_VERSION`                     | Docker     | `2025.12.0` / `2025.12.0` | Source / destination CLI version (build arg + runtime)                         |
+| `BW_CLI_OLD_FALLBACK_VERSIONS`                                  | Docker     | `2025.12.0 2024.9.0`      | Source CLI versions tried on login transport failure                           |
+| `BW_CLI_NEW_FALLBACK_VERSIONS`                                  | Docker     | `2025.12.0 2024.9.0`      | Destination CLI versions tried on import failure                               |
 | `BW_LOGIN_RETRIES` / `BW_LOGIN_RETRY_DELAY`                     | both       | `3` / `5`                 | Source login retry count / initial backoff (s)                                 |
 | `BW_API_CONNECT_TIMEOUT` / `BW_API_MAX_TIME` / `BW_API_RETRIES` | both       | `10` / `60` / `3`         | REST `curl` connect timeout / max time / retries                               |
 | `BW_IMPORT_LIMIT`                                               | both       | unset                     | Import only N items per type (testing)                                         |
@@ -486,6 +503,10 @@ Remove it (or leave it unset) for a full sync.
   transport incompatibility. The container retries and auto-falls-back across
   `BW_CLI_OLD_FALLBACK_VERSIONS`; if it still fails, pin a known-good version
   with `BW_CLI_OLD_VERSION` (see [Bitwarden CLI versions](#bitwarden-cli-versions)).
+- **`The decryption operation failed` / `Failed to encrypt ciphers in batch` on
+  import.** A 2026.x destination-CLI regression. The container auto-falls-back
+  across `BW_CLI_NEW_FALLBACK_VERSIONS`; if needed, pin `BW_CLI_NEW_VERSION` to a
+  known-good version (`2025.12.0`).
 - **`bw-old: command not found` (standalone).** Create the CLI wrappers — see
   [Install the CLI wrappers](#1-install-the-cli-wrappers).
 - **"New client logged in" emails.** Persist the CLI state directory or set a

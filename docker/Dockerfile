@@ -1,5 +1,5 @@
-# Use a Node.js base image
-FROM alpine:latest
+# Alpine base image. Pinned for reproducible builds; Renovate keeps it current.
+FROM alpine:3.21
 
 # Set working directory
 WORKDIR /app
@@ -14,10 +14,15 @@ ENV NODE_OPTIONS="--no-deprecation"
 # by setting the matching env var (the entrypoint reconciles a concrete version
 # that differs from the baked-in one). Keep comments on their own lines: Docker
 # does NOT strip an inline "# ..." after an ARG value.
+# Both are pinned to a known-good version (Renovate proposes bumps, gated by the
+# CLI compatibility test) — 2026.x has broken both Vaultwarden login (#50) and
+# Bitwarden Cloud import.
 # Source / Vaultwarden compatibility (issue #50):
+# renovate: datasource=npm depName=@bitwarden/cli
 ARG BW_CLI_OLD_VERSION=2025.12.0
 # Destination / Bitwarden cloud:
-ARG BW_CLI_NEW_VERSION=latest
+# renovate: datasource=npm depName=@bitwarden/cli
+ARG BW_CLI_NEW_VERSION=2025.12.0
 # Bridge the build args to env vars so they can be overridden at runtime too.
 ENV BW_CLI_OLD_VERSION=${BW_CLI_OLD_VERSION} \
     BW_CLI_NEW_VERSION=${BW_CLI_NEW_VERSION}

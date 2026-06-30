@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# CLI compatibility test — runs entirely on the CI runner.
+#
+# 1. Starts a throwaway Vaultwarden (pinned, Renovate-managed image) from the
+#    committed seed volume (the source account + sample items).
+# 2. Builds the bitwarden-sync image from the current checkout (so it uses the
+#    CLI versions pinned in docker/Dockerfile — including a Renovate PR's bump).
+# 3. Runs one real sync: source = the in-CI Vaultwarden, dest = Bitwarden Cloud.
+# 4. Asserts the run reported success.
+#
+# This exercises both historical break points on the candidate CLI *and* the
+# candidate Vaultwarden version:
+#   - bw-old login/export   (issue #50: "Premature close")
+#   - bw-new import          ("decryption operation failed")
+#
+# A green run is what Renovate waits for before auto-merging an @bitwarden/cli
+# or vaultwarden/server bump. Account credentials come from the environment
+# (CI injects them from repo secrets). See test/cli-compat/README.md.
+#
+# ⚠️ The destination account is WIPED and replaced. Both accounts are throwaway.
+set -euo pipefail
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(cd "$HERE/../.." && pwd)
+COMPOSE="$HERE/docker-compose.yml"
+IMAGE_TAG="${IMAGE_TAG:-bitwarden-sync:cli-compat}"
+PORT="${PORT:-8000}"
+
+fail() { echo "::error::$*" >&2; exit 1; }
+
+# Source = the in-CI Vaultwarden (seeded volume); dest = real Bitwarden Cloud.
+[ -f "$HERE/vaultwarden-data/db.sqlite3" ] || fail "Missing seed volume at test/cli-compat/vaultwarden-data/db.sqlite3 — see test/cli-compat/README.md"
+: "${BW_CLIENTID_SOURCE:?set TEST_BW_CLIENTID_SOURCE}"
+: "${BW_CLIENTSECRET_SOURCE:?set TEST_BW_CLIENTSECRET_SOURCE}"
+: "${BW_PASS_SOURCE:?set TEST_BW_PASS_SOURCE}"
+: "${BW_SERVER_DEST:?set TEST_BW_SERVER_DEST (e.g. https://vault.bitwarden.com)}"
+: "${BW_CLIENTID_DEST:?set TEST_BW_CLIENTID_DEST}"
+: "${BW_CLIENTSECRET_DEST:?set TEST_BW_CLIENTSECRET_DEST}"
+: "${BW_PASS_DEST:?set TEST_BW_PASS_DEST}"
+
+# Copy the committed seed to a writable temp dir so the test never mutates the repo.
+VW_DATA_DIR=$(mktemp -d)
+cp -a "$HERE/vaultwarden-data/." "$VW_DATA_DIR/"
+export VW_DATA_DIR
+
+cleanup() {
+  docker compose -f "$COMPOSE" down >/dev/null 2>&1 || true
+  rm -rf "$VW_DATA_DIR"
+}
+trap cleanup EXIT
+
+# 1. Start Vaultwarden and wait for readiness.
+docker compose -f "$COMPOSE" up -d
+echo "# Waiting for Vaultwarden... #"
+for _ in $(seq 1 30); do
+  curl -fsS "http://localhost:$PORT/alive" >/dev/null 2>&1 && break
+  sleep 2
+done
+curl -fsS "http://localhost:$PORT/alive" >/dev/null || fail "Vaultwarden did not become ready"
+
+# 2. Build the image from the current checkout (uses the PR's pinned CLI versions).
+docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
+
+# 3. Run one sync: source = in-CI Vaultwarden, dest = Bitwarden Cloud.
+LOG=$(mktemp)
+set +e
+docker run --rm --network host \
+  -e BW_SERVER_SOURCE="http://localhost:$PORT" \
+  -e BW_CLIENTID_SOURCE -e BW_CLIENTSECRET_SOURCE -e BW_PASS_SOURCE \
+  -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
+  -e BW_TAR_PASS="cli-compat-test" \
+  -e BITWARDENCLI_APPDATA_DIR="/tmp/bw" \
+  "$IMAGE_TAG" /app/script.sh 2>&1 | tee "$LOG"
+rc=${PIPESTATUS[0]}
+set -e
+
+# 4. Assert.
+[ "$rc" -eq 0 ] || fail "sync exited with code $rc"
+grep -q "status=success" "$LOG" || fail "sync did not report 'status=success'"
+echo "CLI compatibility test PASSED ($(grep -o 'cli_source=[^ ]*' "$LOG" | tail -1), $(grep -o 'cli_dest=[^ ]*' "$LOG" | tail -1))"

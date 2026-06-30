@@ -1,4 +1,53 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"]
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "description": [
+    "platformAutomerge is false on purpose: with no branch protection, GitHub-native auto-merge would merge before the CLI Compatibility Test finishes. Renovate-managed auto-merge instead waits for all branch checks to pass first."
+  ],
+  "automerge": true,
+  "platformAutomerge": false,
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**",
+    "**/examples/**",
+    "**/__tests__/**",
+    "**/__fixtures__/**"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the pinned @bitwarden/cli versions in the Dockerfile ARGs",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( versioning=(?<versioning>\\S+))?\\s+ARG \\w+=(?<currentValue>.+?)\\s"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}npm{{/if}}"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group both pinned Bitwarden CLI ARGs into one PR. Auto-merge waits for the CLI Compatibility Test (Renovate-managed auto-merge holds until branch checks pass).",
+      "matchDepNames": ["@bitwarden/cli"],
+      "groupName": "bitwarden-cli",
+      "commitMessageTopic": "Bitwarden CLI",
+      "automerge": true
+    },
+    {
+      "description": "The CLI compatibility test's Vaultwarden image — bumps run the full E2E test before auto-merge.",
+      "matchDepNames": ["vaultwarden/server"],
+      "commitMessageTopic": "Vaultwarden (test)",
+      "automerge": true
+    },
+    {
+      "description": "Pin GitHub Actions to commit SHAs and keep them current",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
+    },
+    {
+      "description": "Don't manage the user-facing docker-compose template image",
+      "matchFileNames": ["docker/docker-compose.yml"],
+      "enabled": false
+    }
+  ]
 }

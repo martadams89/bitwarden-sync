@@ -1,0 +1,54 @@
+{
+  "encrypted": false,
+  "folders": [],
+  "items": [
+    {
+      "type": 1,
+      "name": "CLI Compat Login",
+      "notes": null,
+      "favorite": false,
+      "folderId": null,
+      "login": {
+        "username": "compat@example.com",
+        "password": "compat-password",
+        "uris": [{ "match": null, "uri": "https://example.com" }],
+        "totp": null
+      }
+    },
+    {
+      "type": 2,
+      "name": "CLI Compat Note",
+      "notes": "compatibility test note",
+      "favorite": false,
+      "folderId": null,
+      "secureNote": { "type": 0 }
+    },
+    {
+      "type": 3,
+      "name": "CLI Compat Card",
+      "notes": null,
+      "favorite": false,
+      "folderId": null,
+      "card": {
+        "cardholderName": "Compat Test",
+        "brand": "Visa",
+        "number": "4111111111111111",
+        "expMonth": "12",
+        "expYear": "2032",
+        "code": "123"
+      }
+    },
+    {
+      "type": 4,
+      "name": "CLI Compat Identity",
+      "notes": null,
+      "favorite": false,
+      "folderId": null,
+      "identity": {
+        "firstName": "Compat",
+        "lastName": "Tester",
+        "email": "compat@example.com"
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+# Seed volume for the CLI compatibility test. Track only the SQLite DB and the
+# JWT signing key; ignore Vaultwarden's runtime churn (WAL/SHM, caches, uploads).
+*
+!.gitignore
+!db.sqlite3
+!rsa_key.pem

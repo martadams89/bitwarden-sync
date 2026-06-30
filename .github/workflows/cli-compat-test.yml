@@ -1,0 +1,40 @@
+name: CLI Compatibility Test
+
+# Runs entirely on the runner: starts a throwaway Vaultwarden (pinned,
+# Renovate-managed image) from the committed seed volume, builds the image from
+# the PR, and runs a real source->dest sync between two seeded accounts. This is
+# the green check Renovate waits for before auto-merging an @bitwarden/cli or
+# vaultwarden/server bump. One-time setup (6 secrets + seed): test/cli-compat/README.md.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "docker/**"
+      - "test/cli-compat/**"
+      - ".github/workflows/cli-compat-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cli-compat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run CLI compatibility test
+        env:
+          # Source = in-CI Vaultwarden (seeded volume); server URL is localhost
+          # and set inside run.sh, so no source server secret is needed.
+          BW_CLIENTID_SOURCE: ${{ secrets.TEST_BW_CLIENTID_SOURCE }}
+          BW_CLIENTSECRET_SOURCE: ${{ secrets.TEST_BW_CLIENTSECRET_SOURCE }}
+          BW_PASS_SOURCE: ${{ secrets.TEST_BW_PASS_SOURCE }}
+          # Destination = Bitwarden Cloud (throwaway account)
+          BW_SERVER_DEST: ${{ secrets.TEST_BW_SERVER_DEST }}
+          BW_CLIENTID_DEST: ${{ secrets.TEST_BW_CLIENTID_DEST }}
+          BW_CLIENTSECRET_DEST: ${{ secrets.TEST_BW_CLIENTSECRET_DEST }}
+          BW_PASS_DEST: ${{ secrets.TEST_BW_PASS_DEST }}
+        run: bash test/cli-compat/run.sh
