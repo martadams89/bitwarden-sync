@@ -68,22 +68,37 @@ curl -fsSk "https://localhost:$PORT/alive" >/dev/null || fail "Vaultwarden did n
 docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
 
 # 3. Run one sync: source = in-CI Vaultwarden, dest = Bitwarden Cloud.
-# Networking: use --network host so the container shares the runner's netns — the
-# only way to reach both the published Vaultwarden (localhost) and, on GitHub's
-# Azure runners, the internet + Azure's resolver 168.63.129.16 (which is NOT
-# routable from a Docker bridge container). The catch is that the host's
-# /etc/resolv.conf is the 127.0.0.53 systemd-resolved stub, which musl libc in
-# the container can't use — so mount the real upstream resolvers over it.
-RESOLV_MOUNT=()
-if [ -r /run/systemd/resolve/resolv.conf ]; then
-  RESOLV_MOUNT=(-v /run/systemd/resolve/resolv.conf:/etc/resolv.conf:ro)
-  echo "# Using host upstream resolvers (/run/systemd/resolve/resolv.conf) #"
-fi
+# Container DNS is unusable on GitHub's Azure runners (stub resolver in
+# /etc/resolv.conf, public DNS egress blocked, Azure's 168.63.129.16 not routable
+# from containers). But the *host* resolves fine and TCP egress works — so resolve
+# the destination's hostnames on the host and pin them into the container's
+# /etc/hosts via --add-host. The container then connects by IP with no DNS, and
+# TLS still uses the hostname (SNI) so the real cloud certs validate.
+# --network host provides egress + the localhost source.
+# Sanitize the dest URL: secrets often carry a trailing newline, and this one had
+# a stray ')'. Strip whitespace and trailing non-URL characters so the container
+# (and the host resolution below) get a clean hostname.
+BW_SERVER_DEST=$(printf '%s' "${BW_SERVER_DEST:-}" | tr -d '[:space:]' | sed -E 's#[^A-Za-z0-9/]+$##')
+export BW_SERVER_DEST
+
+ADD_HOSTS=()
+dest_host=$(printf '%s' "$BW_SERVER_DEST" | sed -E 's#^[a-z]+://##; s#[:/].*$##')
+for h in "$dest_host" "${dest_host/vault./api.}" "${dest_host/vault./identity.}"; do
+  [ -n "$h" ] || continue
+  # `|| true` inside the subshell so a getent miss can't trip `set -e`.
+  ip=$(getent ahostsv4 "$h" 2>/dev/null | awk 'NR==1{print $1}' || true)
+  if [ -n "$ip" ]; then
+    ADD_HOSTS+=(--add-host "$h:$ip")
+  else
+    echo "# WARN: host could not resolve $h #" >&2
+  fi
+done
+echo "# Pinned destination hosts: ${ADD_HOSTS[*]:-none} #"
 
 LOG=$(mktemp)
 set +e
 docker run --rm --network host \
-  "${RESOLV_MOUNT[@]}" \
+  "${ADD_HOSTS[@]}" \
   -e BW_SERVER_SOURCE="https://localhost:$PORT" \
   -e BW_CLIENTID_SOURCE -e BW_CLIENTSECRET_SOURCE -e BW_PASS_SOURCE \
   -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
