@@ -68,6 +68,23 @@ curl -fsSk "https://localhost:$PORT/alive" >/dev/null || fail "Vaultwarden did n
 docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
 
 # 3. Run one sync: source = in-CI Vaultwarden, dest = Bitwarden Cloud.
+# Build the container's DNS list. GitHub-hosted (Azure) runners put an unusable
+# systemd-resolved stub (127.0.0.53) in /etc/resolv.conf and block container
+# egress to public DNS, so prefer the host's *real* upstream resolvers from
+# /run/systemd/resolve/resolv.conf, then add public fallbacks for other runners.
+DNS_ARGS=()
+for resolv in /run/systemd/resolve/resolv.conf /etc/resolv.conf; do
+  [ -r "$resolv" ] || continue
+  while read -r kw addr _; do
+    [ "$kw" = "nameserver" ] || continue
+    case "$addr" in 127.* | ::1 | "") continue ;; esac
+    DNS_ARGS+=(--dns "$addr")
+  done < "$resolv"
+  [ ${#DNS_ARGS[@]} -gt 0 ] && break
+done
+DNS_ARGS+=(--dns 1.1.1.1 --dns 8.8.8.8)
+echo "# Container DNS: ${DNS_ARGS[*]} #"
+
 LOG=$(mktemp)
 set +e
 # Default bridge: --dns writes the container's resolv.conf directly (no embedded
@@ -75,7 +92,7 @@ set +e
 # Vaultwarden is reached via the Docker host gateway (its published 8000 port).
 docker run --rm \
   --add-host=host.docker.internal:host-gateway \
-  --dns 1.1.1.1 --dns 8.8.8.8 \
+  "${DNS_ARGS[@]}" \
   -e BW_SERVER_SOURCE="https://host.docker.internal:8000" \
   -e BW_CLIENTID_SOURCE -e BW_CLIENTSECRET_SOURCE -e BW_PASS_SOURCE \
   -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
