@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/martadams89/bitwarden-sync/compare/v1.0.0...v1.1.0) (2026-06-30)
+
+
+### Features
+
+* enhance release workflow with auto-merge capability and token handling ([8f18abc](https://github.com/martadams89/bitwarden-sync/commit/8f18abc67c7d7ae821e49a824d6b243f0d4a4532))
+
 ## 1.0.0 (2026-06-30)
 
 ### Features
