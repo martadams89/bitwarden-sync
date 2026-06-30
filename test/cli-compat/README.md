@@ -54,15 +54,15 @@ API key.
 
 (GitHub → Settings → Secrets and variables → Actions)
 
-| Secret                        | Value                                                |
-| ----------------------------- | ---------------------------------------------------- |
-| `TEST_BW_CLIENTID_SOURCE`     | seeded Vaultwarden account `client_id` (`user.…`)    |
-| `TEST_BW_CLIENTSECRET_SOURCE` | seeded Vaultwarden account `client_secret`           |
-| `TEST_BW_PASS_SOURCE`         | seeded Vaultwarden account master password           |
-| `TEST_BW_SERVER_DEST`         | `https://vault.bitwarden.com` (or `.eu`)             |
-| `TEST_BW_CLIENTID_DEST`       | cloud account `client_id`                            |
-| `TEST_BW_CLIENTSECRET_DEST`   | cloud account `client_secret`                        |
-| `TEST_BW_PASS_DEST`           | cloud account master password                        |
+| Secret                        | Value                                             |
+| ----------------------------- | ------------------------------------------------- |
+| `TEST_BW_CLIENTID_SOURCE`     | seeded Vaultwarden account `client_id` (`user.…`) |
+| `TEST_BW_CLIENTSECRET_SOURCE` | seeded Vaultwarden account `client_secret`        |
+| `TEST_BW_PASS_SOURCE`         | seeded Vaultwarden account master password        |
+| `TEST_BW_SERVER_DEST`         | `https://vault.bitwarden.com` (or `.eu`)          |
+| `TEST_BW_CLIENTID_DEST`       | cloud account `client_id`                         |
+| `TEST_BW_CLIENTSECRET_DEST`   | cloud account `client_secret`                     |
+| `TEST_BW_PASS_DEST`           | cloud account master password                     |
 
 The source server is the in-CI Vaultwarden (`localhost`), so no source-server
 secret is needed.
