@@ -75,8 +75,14 @@ docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
 # /etc/hosts via --add-host. The container then connects by IP with no DNS, and
 # TLS still uses the hostname (SNI) so the real cloud certs validate.
 # --network host provides egress + the localhost source.
+# Sanitize the dest URL: secrets often carry a trailing newline, and this one had
+# a stray ')'. Strip whitespace and trailing non-URL characters so the container
+# (and the host resolution below) get a clean hostname.
+BW_SERVER_DEST=$(printf '%s' "${BW_SERVER_DEST:-}" | tr -d '[:space:]' | sed -E 's#[^A-Za-z0-9/]+$##')
+export BW_SERVER_DEST
+
 ADD_HOSTS=()
-dest_host=$(printf '%s' "${BW_SERVER_DEST:-}" | sed -E 's#^[a-z]+://##; s#[:/].*$##')
+dest_host=$(printf '%s' "$BW_SERVER_DEST" | sed -E 's#^[a-z]+://##; s#[:/].*$##')
 for h in "$dest_host" "${dest_host/vault./api.}" "${dest_host/vault./identity.}"; do
   [ -n "$h" ] || continue
   # `|| true` inside the subshell so a getent miss can't trip `set -e`.
