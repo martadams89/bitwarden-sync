@@ -131,11 +131,11 @@ The image is published to **both** registries (use whichever you prefer):
 
 Available tags:
 
-| Tag | Points to | Use it when |
-| --- | --------- | ----------- |
-| `latest` | The newest stable **release** | You want the current stable image (default). |
+| Tag                 | Points to                      | Use it when                                                       |
+| ------------------- | ------------------------------ | ----------------------------------------------------------------- |
+| `latest`            | The newest stable **release**  | You want the current stable image (default).                      |
 | `1`, `1.2`, `1.2.3` | Semver — major / minor / exact | You want to pin updates (e.g. `:1` = all 1.x, `:1.2.3` = frozen). |
-| `edge` | The latest `main` build | You want the bleeding edge between releases. |
+| `edge`              | The latest `main` build        | You want the bleeding edge between releases.                      |
 
 Releases are automated with [release-please](https://github.com/googleapis/release-please):
 Conventional-Commit messages on `main` drive the version bump, the `CHANGELOG.md`,
