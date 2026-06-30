@@ -70,13 +70,13 @@ docker build -f "$ROOT/docker/Dockerfile" -t "$IMAGE_TAG" "$ROOT"
 # 3. Run one sync: source = in-CI Vaultwarden, dest = Bitwarden Cloud.
 LOG=$(mktemp)
 set +e
-# Join the Vaultwarden compose network: reaches the source by service name
-# ("vaultwarden"). Explicit --dns gives the embedded resolver a working upstream
-# for the external cloud destination (the runner's 127.0.0.53 stub can't be
-# forwarded to), while service-name resolution still works via 127.0.0.11.
-docker run --rm --network cli-compat-net \
+# Default bridge: --dns writes the container's resolv.conf directly (no embedded
+# resolver), giving working external DNS for the cloud destination. The source
+# Vaultwarden is reached via the Docker host gateway (its published 8000 port).
+docker run --rm \
+  --add-host=host.docker.internal:host-gateway \
   --dns 1.1.1.1 --dns 8.8.8.8 \
-  -e BW_SERVER_SOURCE="https://vaultwarden:80" \
+  -e BW_SERVER_SOURCE="https://host.docker.internal:8000" \
   -e BW_CLIENTID_SOURCE -e BW_CLIENTSECRET_SOURCE -e BW_PASS_SOURCE \
   -e BW_SERVER_DEST -e BW_CLIENTID_DEST -e BW_CLIENTSECRET_DEST -e BW_PASS_DEST \
   -e BW_TAR_PASS="cli-compat-test" \
