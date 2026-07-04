@@ -26,7 +26,14 @@ permissions:
 # destination, so two overlapping runs would corrupt each other's vault. Queue
 # rather than cancel — cancelling mid-sync could leave the dest half-cleared.
 concurrency:
-  group: cli-compat
+  # Per-PR (and per-branch) rather than one global group. A single global group
+  # would cancel a still-pending run whenever several PRs/pushes landed close
+  # together — and a cancelled run on a PR's HEAD leaves its required
+  # "CLI Compatibility Test" check missing, blocking the PR forever (this is
+  # exactly what stranded #71). Scoping the group per PR keeps runs from
+  # cancelling each other. Heavy CLI-relevant syncs are rare, so the loss of
+  # cross-PR serialization is an acceptable trade for never stranding a check.
+  group: cli-compat-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
