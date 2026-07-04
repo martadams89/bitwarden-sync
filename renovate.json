@@ -22,7 +22,13 @@
   "packageRules": [
     {
       "description": "Auto-merge minor/patch/digest once CI is green.",
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest", "lockFileMaintenance"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest",
+        "lockFileMaintenance"
+      ],
       "automerge": true
     },
     {
