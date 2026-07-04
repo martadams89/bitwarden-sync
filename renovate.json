@@ -1,4 +1,35 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"]
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    "group:allNonMajor"
+  ],
+  "timezone": "Europe/London",
+  "schedule": ["after 10pm every weekday", "every weekend"],
+  "labels": ["dependencies"],
+  "prHourlyLimit": 3,
+  "platformAutomerge": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "description": "Auto-merge minor/patch/digest once CI is green.",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest", "lockFileMaintenance"],
+      "automerge": true
+    },
+    {
+      "description": "Majors also auto-merge when green, after a short soak.",
+      "matchUpdateTypes": ["major"],
+      "automerge": true,
+      "minimumReleaseAge": "3 days"
+    }
+  ]
 }

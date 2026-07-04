@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cli-compat:
+    # NOTE: this job name must stay exactly "CLI Compatibility Test" — it is the
+    # required status check on `main`. It runs on every PR (no path filter) so
+    # the required check can never get stuck "waiting" like it used to.
+    name: CLI Compatibility Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bash syntax check
+        run: bash -n bitwarden_sync.sh
+
+      - name: Install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+
+      - name: Unit tests (bats)
+        run: bats tests
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck
+        run: shellcheck --severity=error bitwarden_sync.sh

@@ -2,6 +2,12 @@
 
 🔐 backup and restore your Bitwarden vault between servers.
 
+[![CI](https://github.com/martadams89/bitwarden-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/martadams89/bitwarden-sync/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/martadams89/bitwarden-sync?sort=semver&label=release)](https://github.com/martadams89/bitwarden-sync/releases)
+[![License: MIT](https://img.shields.io/github/license/martadams89/bitwarden-sync)](LICENSE)
+[![Renovate](https://img.shields.io/badge/Renovate-enabled-1A1F6C?logo=renovatebot&logoColor=white)](renovate.json)
+[![ShellCheck](https://img.shields.io/badge/shell-shellcheck%20%2B%20bats-89e051?logo=gnubash&logoColor=white)](.github/workflows/ci.yml)
+
 ### [You will need your API Keys](https://bitwarden.com/help/personal-api-key/)
 
 ### NOTE: This does not currently sync Orgnisations or multiple users.
@@ -258,5 +264,25 @@ environment:
 ```
 
 Remove the variable (or leave it unset) for a full sync.
+
+## Development & automation
+
+This repo maintains itself:
+
+- **CI** (`.github/workflows/ci.yml`) runs on every push and PR:
+  - **`CLI Compatibility Test`** — bash syntax check + [bats](https://github.com/bats-core/bats-core)
+    unit tests for the URL-resolution logic (see [`tests/`](tests/)). This is the required status
+    check on `main`.
+  - **`ShellCheck`** — static analysis of `bitwarden_sync.sh`.
+- **[Renovate](renovate.json)** keeps dependencies current and auto-merges updates once CI is
+  green (including majors after a short soak).
+- **Release Please** cuts semver releases and maintains the changelog automatically from
+  [Conventional Commits](https://www.conventionalcommits.org).
+
+Run the tests locally with [bats](https://bats-core.readthedocs.io):
+
+```bash
+bats tests
+```
 
 🚀 Your Bitwarden Backup and Restore setup is now complete!
