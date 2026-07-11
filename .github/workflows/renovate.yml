@@ -20,7 +20,7 @@ name: Renovate
 #      branches).
 on:
   schedule:
-    - cron: '0 3 * * 1' # Mondays 03:00 UTC
+    - cron: "0 3 * * 1" # Mondays 03:00 UTC
   workflow_dispatch:
     inputs:
       logLevel:
@@ -48,6 +48,6 @@ jobs:
         env:
           RENOVATE_REPOSITORIES: ${{ github.repository }}
           RENOVATE_PLATFORM: github
-          RENOVATE_ONBOARDING: 'false'
+          RENOVATE_ONBOARDING: "false"
           RENOVATE_REQUIRE_CONFIG: required
           LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
