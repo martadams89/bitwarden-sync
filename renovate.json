@@ -1,11 +1,16 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":dependencyDashboard"],
+  "extends": ["config:recommended", ":semanticCommits", ":dependencyDashboard"],
   "description": [
-    "platformAutomerge uses GitHub-native auto-merge, which is gated by branch protection: 'Allow auto-merge' is enabled and main requires the 'CLI Compatibility Test' check, so a bump only merges once that check is green. The check runs on every PR (skipping the heavy sync when irrelevant) so it never blocks unrelated PRs."
+    "platformAutomerge uses GitHub-native auto-merge, which is gated by branch protection: 'Allow auto-merge' is enabled and main requires the 'CLI Compatibility Test' check, so a bump only merges once that check is green. The check runs on every PR (skipping the heavy sync when irrelevant) so it never blocks unrelated PRs. All update types (major/minor/patch/pin/digest) auto-merge — CI is the gate, not semver.",
+    "Self-hosted via .github/workflows/renovate.yml (weekly cron + manual dispatch); cadence lives there, not here."
   ],
   "automerge": true,
   "platformAutomerge": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
   "ignorePaths": [
     "**/node_modules/**",
     "**/bower_components/**",
