@@ -20,7 +20,7 @@ name: Renovate
 #      branches).
 on:
   schedule:
-    - cron: '0 3 * * 1' # Mondays 03:00 UTC
+    - cron: '0 2 * * *' # daily at 2am UTC
   workflow_dispatch:
     inputs:
       logLevel:
