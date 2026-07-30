@@ -7,7 +7,7 @@
 # repo, and Vaultwarden migrates the seed DB forward when the image is newer.
 services:
   vaultwarden:
-    image: vaultwarden/server:1.37.0
+    image: vaultwarden/server:1.37.1
     container_name: vw-cli-compat
     environment:
       - ROCKET_PORT=80
