@@ -23,13 +23,11 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     env:
-      # Add a RELEASE_PLEASE_TOKEN PAT (or GitHub App token) to get fully
-      # automatic releases: the release PR is then created by that token, so its
-      # CI checks actually run and it can auto-merge. Without it, this falls back
-      # to GITHUB_TOKEN — release PRs still open automatically, but you click
-      # "merge" yourself (GITHUB_TOKEN-created PRs don't trigger CI, so a required
-      # check would otherwise never report and auto-merge could never complete).
-      HAS_RP_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
+      # Use the same PAT/App token as self-hosted Renovate. PRs created with
+      # GITHUB_TOKEN do not trigger CI, so they cannot satisfy the required
+      # merge gate. The fallback keeps release-please usable if the secret is
+      # ever removed, but automated merging is deliberately disabled then.
+      HAS_RP_TOKEN: ${{ secrets.RENOVATE_TOKEN != '' }}
     outputs:
       # Manifest mode prefixes per-package outputs with the path ("." here).
       release_created: ${{ steps.rp.outputs['.--release_created'] }}
@@ -40,12 +38,12 @@ jobs:
       - id: rp
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Auto-merge the release PR
         if: ${{ steps.rp.outputs.pr && env.HAS_RP_TOKEN == 'true' }}
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
         run: gh pr merge --auto --squash "${{ fromJson(steps.rp.outputs.pr).number }}"
 
   publish:
