@@ -30,10 +30,10 @@ jobs:
       HAS_RP_TOKEN: ${{ secrets.RENOVATE_TOKEN != '' }}
     outputs:
       # Manifest mode prefixes per-package outputs with the path ("." here).
-      release_created: ${{ steps.rp.outputs['.--release_created'] }}
-      major: ${{ steps.rp.outputs['.--major'] }}
-      minor: ${{ steps.rp.outputs['.--minor'] }}
-      patch: ${{ steps.rp.outputs['.--patch'] }}
+      release_created: ${{ steps.rp.outputs.release_created }}
+      major: ${{ steps.rp.outputs.major }}
+      minor: ${{ steps.rp.outputs.minor }}
+      patch: ${{ steps.rp.outputs.patch }}
     steps:
       - id: rp
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
