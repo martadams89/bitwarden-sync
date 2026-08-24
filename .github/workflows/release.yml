@@ -44,7 +44,7 @@ jobs:
         if: ${{ steps.rp.outputs.pr && env.HAS_RP_TOKEN == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
-        run: gh pr merge --auto --squash "${{ fromJson(steps.rp.outputs.pr).number }}"
+        run: gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "${{ fromJson(steps.rp.outputs.pr).number }}"
 
   publish:
     needs: release-please
