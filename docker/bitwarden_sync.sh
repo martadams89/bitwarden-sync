@@ -405,10 +405,7 @@ SOURCE_OUTPUT_FILE_JSON=/app/backups/$SOURCE_EXPORT_OUTPUT_BASE$TIMESTAMP.json
 
 # Delete previous backups over 30 days old
 echo "# Deleting previous backups older than 30 days... #"
-current_date=$(date +%Y-%m-%d)
-source_export_files=$(find /app/backups -type f -name "bw_export_*.tar.gz.enc")
-find $source_export_files -type f -mtime +30 -exec rm -f {} +
-rm -f -R $SOURCE_EXPORT_OUTPUT_BASE*.json
+cleanup_backup_files /app/backups
 
 # Login to our Server (using old CLI for Vaultwarden compatibility) and unlock.
 # source_login_unlock handles logout/config/login/unlock with retry + backoff.

@@ -2,6 +2,21 @@
 # Sourced by docker/entrypoint.sh (boot-time version reconcile) and
 # docker/bitwarden_sync.sh (run-time auto-fallback). Not executable on its own.
 
+# Remove stale backup artifacts without ever allowing an empty file list to
+# become an unscoped `find` from the caller's working directory. Run in a
+# subshell so the temporary variable cannot leak into the calling script.
+#   $1 = backup directory
+cleanup_backup_files() (
+  backup_dir="$1"
+
+  [ -d "$backup_dir" ] || return 0
+
+  find "$backup_dir" -type f -name "bw_export_*.tar.gz.enc" \
+    -mtime +30 -exec rm -f -- {} +
+  find "$backup_dir" -type f -name "bw_export_*.json" \
+    -exec rm -f -- {} +
+)
+
 # Reinstall the isolated "old" CLI (used for the Vaultwarden source) at the
 # given version, then restore the global "new" CLI (used for the cloud
 # destination). Builds into a temp dir and swaps, so a failure mid-install can't
