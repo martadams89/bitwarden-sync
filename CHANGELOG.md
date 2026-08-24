@@ -2,10 +2,9 @@
 
 ## [1.1.1](https://github.com/martadams89/bitwarden-sync/compare/v1.1.0...v1.1.1) (2026-08-24)
 
-
 ### Bug Fixes
 
-* prevent backup cleanup from deleting app scripts ([#104](https://github.com/martadams89/bitwarden-sync/issues/104)) ([05dc38b](https://github.com/martadams89/bitwarden-sync/commit/05dc38b4e307572509c39d82eb8611e0b5d2d995))
+- prevent backup cleanup from deleting app scripts ([#104](https://github.com/martadams89/bitwarden-sync/issues/104)) ([05dc38b](https://github.com/martadams89/bitwarden-sync/commit/05dc38b4e307572509c39d82eb8611e0b5d2d995))
 
 ## [1.1.0](https://github.com/martadams89/bitwarden-sync/compare/v1.0.0...v1.1.0) (2026-06-30)
 
