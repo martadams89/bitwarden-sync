@@ -2,10 +2,9 @@
 
 ## [1.1.2](https://github.com/martadams89/bitwarden-sync/compare/v1.1.1...v1.1.2) (2026-08-24)
 
-
 ### Bug Fixes
 
-* publish release images for root component ([#106](https://github.com/martadams89/bitwarden-sync/issues/106)) ([866bccd](https://github.com/martadams89/bitwarden-sync/commit/866bccd1fe934710df1633d462be82b01679321c))
+- publish release images for root component ([#106](https://github.com/martadams89/bitwarden-sync/issues/106)) ([866bccd](https://github.com/martadams89/bitwarden-sync/commit/866bccd1fe934710df1633d462be82b01679321c))
 
 ## [1.1.1](https://github.com/martadams89/bitwarden-sync/compare/v1.1.0...v1.1.1) (2026-08-24)
 
