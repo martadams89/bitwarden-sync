@@ -39,6 +39,12 @@
       "automerge": true
     },
     {
+      "description": "HELD: @bitwarden/cli 2026.9.0 fails 'CLI Compatibility Test' — source vault login succeeds but unlock fails (BW_PASS_SOURCE) — while main stays green on 2026.8.0, confirming a CLI regression rather than a repo/secret problem. Remove once a newer @bitwarden/cli release unlocks correctly again (verify manually before removing).",
+      "matchDepNames": ["@bitwarden/cli"],
+      "matchCurrentVersion": "2026.8.0",
+      "enabled": false
+    },
+    {
       "description": "The CLI compatibility test's Vaultwarden image — bumps run the full E2E test before auto-merge.",
       "matchDepNames": ["vaultwarden/server"],
       "commitMessageTopic": "Vaultwarden (test)",
