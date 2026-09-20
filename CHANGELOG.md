@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.3](https://github.com/martadams89/bitwarden-sync/compare/v1.1.2...v1.1.3) (2026-09-20)
+
+### Bug Fixes
+
+- **renovate:** correct file content (was double-encoded) ([84d618e](https://github.com/martadams89/bitwarden-sync/commit/84d618e2c7929ee1133cffb43d14141c51df5644))
+
 ## [1.1.2](https://github.com/martadams89/bitwarden-sync/compare/v1.1.1...v1.1.2) (2026-08-24)
 
 ### Bug Fixes
